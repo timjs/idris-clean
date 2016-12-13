@@ -1,0 +1,18 @@
+name:                idris-clean
+version:             0.1.0.0
+synopsis:            Idris to Clean backend
+-- description:
+license:             MIT
+license-file:        LICENSE
+author:              Tim Steenvoorden
+maintainer:          Tim Steenvoorden <tim.steenvoorden@gmail.com>
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable idris-codegen-clean
+  main-is:             Main.hs
+  hs-source-dirs:      src
+  other-modules:        IRTS.CodegenClean
+  -- other-extensions:
+  build-depends:       base, idris
+  default-language:    Haskell2010
