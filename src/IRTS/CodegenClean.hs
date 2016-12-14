@@ -12,8 +12,21 @@ import Idris.Core.TT
 
 import Data.Char
 import Data.Text.Lazy (pack, unpack)
+import Text.PrettyPrint.Leijen.Text hiding (string)
 import System.IO
-import Text.PrettyPrint.Leijen.Text
+
+-- Helpers ---------------------------------------------------------------------
+
+indentLevel :: Int
+indentLevel = 4
+
+blank :: Doc
+blank = space
+
+string :: String -> Doc
+string = text . pack
+
+-- Code Generator --------------------------------------------------------------
 
 codegenClean :: CodeGenerator
 codegenClean info = do
@@ -35,9 +48,6 @@ start = vsep
     , "Start world = runMain"
     ]
 
-indentLevel :: Int
-indentLevel = 4
-
 cgDecl :: (Name, DDecl) -> Doc
 cgDecl (_, DConstructor name tag arity) = cgCtor name tag arity
 cgDecl (_, DFun name args def) = cgFun name args def
@@ -45,11 +55,13 @@ cgDecl (_, DFun name args def) = cgFun name args def
 cgCtor :: Name -> Int -> Int -> Doc
 cgCtor name tag arity =
     --FIXME strictness
+    blank <$>
     ":: Value |" <+> cgName name <+> hsep (replicate arity "Value")
 
 cgFun :: Name -> [Name] -> DExp -> Doc
 cgFun name args def =
-    "///" <+> cgName name <$>
+    blank <$>
+    "///" <+> string (show name) <$>
     cgName name <+> hsep (map (cgLoc . fst) (zip [0..] args)) <+> char '=' <$>
     indent indentLevel (cgExp def)
 
@@ -59,7 +71,7 @@ cgExp (DV (Glob name)) =
     cgName name
 cgExp (DV (Loc idx)) =
     cgLoc idx
-cgExp (DApp _istailcall_ name args) =
+cgExp (DApp _istail name args) =
     cgApp name args
 cgExp (DLet name def rest) =
     --FIXME should be strict always?
@@ -75,8 +87,6 @@ cgExp (DC _reloc_ _type_ name args) =
 cgExp _ =
     "NOT IMPLEMENTED"
 
-----
-
 cgApp :: Name -> [DExp] -> Doc
 cgApp name args = cgName name <+> hsep (map cgExp args)
 
@@ -88,7 +98,7 @@ cgLoc :: Int -> Doc
 cgLoc idx = "loc" <> int idx
 
 cgName :: Name -> Doc
-cgName name = "idris_" <> (text . pack) (concatMap mangle $ showCG name)
+cgName name = "idris_" <> string (concatMap mangle $ showCG name)
     where
         mangle c
             | isAlpha c || isDigit c = [c]
