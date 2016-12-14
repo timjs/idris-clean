@@ -62,7 +62,7 @@ cgFun :: Name -> [Name] -> DExp -> Doc
 cgFun name args def =
     blank <$>
     "///" <+> string (show name) <$>
-    cgName name <+> hsep (map (cgLoc . fst) (zip [0..] args)) <+> char '=' <$>
+    cgName name <+> hsep (map cgName args) <+> char '=' <$>
     indent indentLevel (cgExp def)
 
 cgExp :: DExp -> Doc
@@ -211,8 +211,9 @@ cgName :: Name -> Doc
 cgName name = "idris_" <> string (concatMap mangle $ showCG name)
     where
         mangle c
-            | isAlpha c || isDigit c = [c]
+            | isAlpha c || isDigit c || isUnderscore c = [c]
             | otherwise = "_" ++ show (fromEnum c) ++ "_"
+        isUnderscore c = c == '_'
 
 cgUnsupported :: Show a => String -> a -> Doc
 cgUnsupported desc val =
