@@ -4,13 +4,14 @@ module IRTS.CodegenClean
     ) where
 
 import Prelude hiding ((<$>))
+import Numeric (showHex)
 
 import IRTS.CodegenCommon
 import IRTS.Lang
 import IRTS.Defunctionalise
 import Idris.Core.TT
 
-import Data.Char (isAlpha, isDigit)
+import Data.Char (isAlpha, isDigit, ord)
 import Data.Text.Lazy (Text, pack, unpack, toUpper)
 import Text.PrettyPrint.Leijen.Text hiding (string)
 import System.IO
@@ -122,9 +123,24 @@ cgApp name args = cgName name <+> hsep (map cgExp args)
 cgConst :: Const -> Doc
 cgConst (I i) = int i
 cgConst (Fl d) = double d
-cgConst (Ch c) = squotes $ char c
-cgConst (Str s) = dquotes $ string s
+cgConst (Ch c) = cgChar c
+cgConst (Str s) = cgString s
 cgConst c = cgUnsupported "constant" c
+
+cgChar :: Char -> Doc
+cgChar = squotes . string . cgEscape False
+
+cgString :: String -> Doc
+cgString = dquotes . string . concatMap (cgEscape True)
+
+cgEscape :: Bool -> Char -> String
+cgEscape True '"' = "\\\""
+cgEscape False '\'' = "\\'"
+cgEscape _ '\\' = "\\\\"
+cgEscape isString c
+    | c >= ' ' && c < '\x7F' = [c]
+    | c <= '\xFF' = "\\x" ++ showHex (ord c) ""
+    | otherwise = error $ "idris-codegen-clean: char " ++ show c ++ " is bigger than 255"
 
 cgInfix, cgPrefix :: Text -> [Doc] -> Doc
 cgInfix op [left, right] = parens $ left <+> text op <+> right
