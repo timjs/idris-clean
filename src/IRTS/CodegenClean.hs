@@ -10,8 +10,8 @@ import IRTS.Lang
 import IRTS.Defunctionalise
 import Idris.Core.TT
 
-import Data.Char
-import Data.Text.Lazy (Text, pack, unpack)
+import Data.Char (isAlpha, isDigit)
+import Data.Text.Lazy (Text, pack, unpack, toUpper)
 import Text.PrettyPrint.Leijen.Text hiding (string)
 import System.IO
 
@@ -107,10 +107,17 @@ cgCase exp alts =
     indent 4 (vsep (map cgAlt alts))
 
 cgAlt :: DAlt -> Doc
-cgAlt alt = cgUnsupported "casealt" alt
+cgAlt (DConCase _tag name args exp) =
+    cgName name <+> hsep (map cgName args) <+> "->" <+> cgExp exp
+cgAlt (DConstCase const exp) =
+    cgConst const <+> "->" <+> cgExp exp
+cgAlt (DDefaultCase exp) =
+    char '_' <+> "->" <+> cgExp exp
 
 cgApp :: Name -> [DExp] -> Doc
 cgApp name args = cgName name <+> hsep (map cgExp args)
+
+-- Constants and Primitives ----------------------------------------------------
 
 cgConst :: Const -> Doc
 cgConst (I i) = int i
@@ -200,21 +207,27 @@ cgPrim LFNegate = cgPrefix "~" -- \[x] -> text "~" <> x
 
 cgPrim f = \_args -> cgUnsupported "primitive" f
 
+-- Names -----------------------------------------------------------------------
+
 cgVar :: LVar -> Doc
-cgVar (Loc idx) = cgLoc idx
+cgVar (Loc idx) = cgLoc idx --FIXME not in ir?
 cgVar (Glob name) = cgName name
 
 cgLoc :: Int -> Doc
 cgLoc idx = "loc" <> int idx
 
 cgName :: Name -> Doc
-cgName name = "idris_" <> string (concatMap mangle $ showCG name)
+cgName name = string (concatMap mangle $ showCG name)
     where
         mangle c
-            | isAlpha c || isDigit c || isUnderscore c = [c]
+            | isIdent c = [c]
+            | isSep c = "_"
+            | isBrace c = ""
             | otherwise = "_" ++ show (fromEnum c) ++ "_"
-        isUnderscore c = c == '_'
+        isIdent c = isAlpha c || isDigit c || c == '_'
+        isSep c = c == '.'
+        isBrace c = c == '{' || c == '}'
 
-cgUnsupported :: Show a => String -> a -> Doc
-cgUnsupported desc val =
-    text "UNSUPPORTED" <+> string (show val)
+cgUnsupported :: Show a => Text -> a -> Doc
+cgUnsupported cat val =
+    "abort" <+> dquotes ("UNSUPPORTED" <+> text (toUpper cat) <+> string (show val))
