@@ -14,6 +14,7 @@ import Numeric (showHex)
 import Data.Char (isAlpha, isDigit, ord)
 import Data.Text.Lazy (Text, pack, unpack, toUpper)
 import System.IO (withFile, IOMode(..))
+import System.FilePath (takeBaseName)
 
 import Text.PrettyPrint.Leijen.Text hiding (string)
 
@@ -33,7 +34,7 @@ operator op [left, right] = parens $ left <+> text op <+> right
 call func args = parens $ text func <+> hsep args
 
 mangle :: Name -> Text
-mangle name = pack (concatMap mangleChar $ showCG name)
+mangle name = pack $ "Idris_" ++ concatMap mangleChar (showCG name)
     where
         mangleChar c
             | isIdent c = [c]
@@ -49,23 +50,30 @@ mangle name = pack (concatMap mangleChar $ showCG name)
 codegenClean :: CodeGenerator
 codegenClean info = do
     let declarations = vsep $ map cgDecl (defunDecls info)
-    let output = vsep [cgPrelude, declarations]
+    let output = vsep
+            [ cgModule (takeBaseName $ outputFile info)
+            , cgImports
+            , cgPredefined
+            , declarations
+            , cgStart
+            ]
     withFile (outputFile info) WriteMode (`hPutDoc` output)
     where
         isFun (_, DFun{}) = True
         isFun (_, DConstructor{}) = False
 
-cgPrelude :: Doc
-cgPrelude = vsep
-    [ "module Main"
-    , blank
-    , "import StdEnv"
-    , blank
-    , ":: Value = .."
-    , blank
-    , "Start :: *World -> *World"
-    , "Start world = runMain"
-    , blank
+cgModule :: String -> Doc
+cgModule name = "module" <+> string name
+
+cgImports, cgPredefined, cgStart :: Doc
+cgImports = vsep $ map ("import" <+>)
+    [ "StdEnv" ]
+cgPredefined = vsep
+    [ ":: Value = .." ]
+cgStart = vsep
+    [ "Start :: *World -> *World"
+    , "Start world ="
+    , indent 4 ("let res =" <+> cgName (sMN 0 "runMain") <+> "in" <+> "world")
     ]
 
 -- Declarations and Expressions ------------------------------------------------
@@ -94,8 +102,8 @@ cgExp (DApp _istail name args) =
     cgApp name args
 cgExp (DLet name def rest) =
     --FIXME should be strict always?
-    char '#' <+> cgName name <+> char '=' <+> cgExp def <$>
-    cgExp rest <$>
+    "let" <+> cgName name <+> char '=' <+> cgExp def <+> "in" <$>
+    indent 4 (cgExp rest) <$>
     blank
 cgExp (DUpdate var def) =
     cgUnsupported "update" (var, def)
@@ -113,7 +121,7 @@ cgExp (DConst const) =
 cgExp (DOp prim exps) =
     cgPrim prim (map cgExp exps)
 cgExp DNothing =
-    empty
+    cgUnsupported "nothing" ()
 cgExp (DError msg) =
     "abort" <+> dquotes (string msg)
 cgExp e =
@@ -121,7 +129,8 @@ cgExp e =
 
 cgCase :: DExp -> [DAlt] -> Doc
 cgCase exp alts =
-    "case" <+> cgExp exp <+> "of" <$>
+    -- parens for `case` in `case`
+    "case" <+> parens (cgExp exp) <+> "of" <$>
     indent 4 (vsep (map cgAlt alts))
 
 cgAlt :: DAlt -> Doc

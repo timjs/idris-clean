@@ -14,7 +14,7 @@ executable idris-codegen-clean
   hs-source-dirs:      src
   other-modules:       IRTS.CodegenClean
   -- other-extensions:
-  build-depends:       base, idris, text, wl-pprint-text
+  build-depends:       base, filepath, text, wl-pprint-text, idris
   default-language:    Haskell2010
 
   ghc-options:         -O2
