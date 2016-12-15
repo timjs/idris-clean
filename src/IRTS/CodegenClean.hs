@@ -12,6 +12,7 @@ import Idris.Core.TT
 
 import Numeric (showHex)
 import Data.Char (isAlpha, isDigit, ord)
+import Data.List (partition)
 import Data.Text.Lazy (Text, pack, unpack, toUpper)
 import System.IO (withFile, IOMode(..))
 import System.FilePath (takeBaseName)
@@ -49,12 +50,12 @@ mangle name = pack $ "Idris_" ++ concatMap mangleChar (showCG name)
 
 codegenClean :: CodeGenerator
 codegenClean info = do
-    let declarations = vsep $ map cgDecl (defunDecls info)
+    let (funcs, ctors) = partition isFun (defunDecls info)
     let output = vsep
             [ cgModule (takeBaseName $ outputFile info)
             , cgImports
-            , cgPredefined
-            , declarations
+            , cgConstructors ctors
+            , cgFunctions funcs
             , cgStart
             ]
     withFile (outputFile info) WriteMode (`hPutDoc` output)
@@ -65,11 +66,9 @@ codegenClean info = do
 cgModule :: String -> Doc
 cgModule name = "module" <+> string name
 
-cgImports, cgPredefined, cgStart :: Doc
+cgImports, cgStart :: Doc
 cgImports = vsep $ map ("import" <+>)
     [ "StdEnv" ]
-cgPredefined = vsep
-    [ ":: Value = .." ]
 cgStart = vsep
     [ "Start :: *World -> *World"
     , "Start world ="
@@ -78,18 +77,21 @@ cgStart = vsep
 
 -- Declarations and Expressions ------------------------------------------------
 
-cgDecl :: (Name, DDecl) -> Doc
-cgDecl (_, DConstructor name tag arity) = cgCtor name tag arity
-cgDecl (_, DFun name args def) = cgFun name args def
+cgConstructors :: [(Name, DDecl)] -> Doc
+cgConstructors decls =
+    ":: Idris_Value = Idris_Dummy_Value" <$>
+    indent 4 (vsep $ map (cgCtor . snd) decls)
 
-cgCtor :: Name -> Int -> Int -> Doc
-cgCtor name tag arity =
+cgCtor :: DDecl -> Doc
+cgCtor (DConstructor name _tag arity) =
     --FIXME strictness
-    blank <$>
-    ":: Value |" <+> cgName name <+> hsep (replicate arity "Value")
+    char '|' <+> cgName name <+> hsep (replicate arity "Idris_Value")
 
-cgFun :: Name -> [Name] -> DExp -> Doc
-cgFun name args def =
+cgFunctions :: [(Name, DDecl)] -> Doc
+cgFunctions = vsep . map (cgFun . snd)
+
+cgFun :: DDecl -> Doc
+cgFun (DFun name args def) =
     blank <$>
     "///" <+> string (show name) <$>
     cgName name <+> hsep (map cgName args) <+> char '=' <$>
