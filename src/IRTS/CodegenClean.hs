@@ -62,6 +62,9 @@ cgHelpers = vsep
     , "unsafeCoerce x = code inline {"
     , indent level "pop_a 0"
     , "}"
+    , blank
+    , "nothing :: a"
+    , "nothing = abort \"NOTHING HITTED\""
     ]
 cgStart = vsep
     [ "Start :: *World -> *World"
@@ -119,7 +122,7 @@ cgExp (DConst const) =
 cgExp (DOp prim exps) =
     cgPrim prim exps
 cgExp DNothing =
-    "()"
+    "nothing"
 cgExp (DError msg) =
     "abort" <+> dquotes (string msg)
 cgExp e =
