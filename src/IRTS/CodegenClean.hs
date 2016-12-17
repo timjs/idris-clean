@@ -119,8 +119,7 @@ cgExp (DConst const) =
 cgExp (DOp prim exps) =
     cgPrim prim exps
 cgExp DNothing =
-    --FIXME just Unit?
-    cgUnsupported "nothing" ()
+    "()"
 cgExp (DError msg) =
     "abort" <+> dquotes (string msg)
 cgExp e =
