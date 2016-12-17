@@ -11,11 +11,11 @@ import IRTS.Defunctionalise
 import Idris.Core.TT
 
 import Numeric (showHex)
-import Data.Char (isAlpha, isDigit, ord)
-import Data.List (partition)
-import Data.Text.Lazy (Text, pack, unpack, toUpper)
-import System.IO (withFile, IOMode(..))
-import System.FilePath (takeBaseName)
+import Data.Char
+import Data.List
+import Data.Text.Lazy (Text, pack, unpack)
+import System.IO
+import System.FilePath
 
 import Text.PrettyPrint.Leijen.Text hiding (string)
 
@@ -239,12 +239,19 @@ cgLoc :: Int -> Doc
 cgLoc idx = "x" <> int idx
 
 cgFunName, cgConName, cgVarName :: Name -> Doc
-cgFunName name = "idris_" <> text (mangle name)
-cgConName name = "Idris_" <> text (mangle name)
-cgVarName = text . mangle
+cgFunName name = string . fix $ "idris_" ++ mangle name
+cgConName name = string . fix $ "Idris_" ++ mangle name
+cgVarName name = string . fix $ mangle name
 
-mangle :: Name -> Text
-mangle name = pack $ concatMap mangleChar (showCG name)
+-- Fixes mkFnCon and mkUnderCon from IRTS.Defunctionalise
+fix :: String -> String
+fix name@(c:cs)
+    | "P_" `isPrefixOf` name = toLower c : cs
+    | "idris_U_" `isPrefixOf` name = toUpper c : cs
+    | otherwise = name
+
+mangle :: Name -> String
+mangle name = concatMap mangleChar (showCG name)
     where
         mangleChar c
             | isIdent c = [c]
@@ -259,4 +266,4 @@ mangle name = pack $ concatMap mangleChar (showCG name)
 
 cgUnsupported :: Show a => Text -> a -> Doc
 cgUnsupported cat val =
-    parens $ "abort" <+> hsep [dquotes $ "UNSUPPORTED" <+> text (toUpper cat) <+> string (show val)]
+    parens $ "abort" <+> hsep [dquotes $ "UNSUPPORTED" <+> text cat <+> string (show val)]
