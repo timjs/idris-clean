@@ -30,22 +30,6 @@ blank = space
 string :: String -> Doc
 string = text . pack
 
-operator, call :: Text -> [Doc] -> Doc
-operator op [left, right] = parens $ left <+> text op <+> right
-call func args = parens $ text func <+> hsep args
-
-mangle :: Name -> Text
-mangle name = pack $ "Idris_" ++ concatMap mangleChar (showCG name)
-    where
-        mangleChar c
-            | isIdent c = [c]
-            | isSep c = "_"
-            | isBrace c = ""
-            | otherwise = "_" ++ show (fromEnum c) ++ "_"
-        isIdent c = isAlpha c || isDigit c || c == '_'
-        isSep c = c == '.'
-        isBrace c = c == '{' || c == '}'
-
 -- Main and Prelude ------------------------------------------------------------
 
 codegenClean :: CodeGenerator
@@ -72,7 +56,7 @@ cgImports = vsep $ map ("import" <+>)
 cgStart = vsep
     [ "Start :: *World -> *World"
     , "Start world ="
-    , indent 4 ("let res =" <+> cgName (sMN 0 "runMain") <+> "in" <+> "world")
+    , indent 4 ("let res =" <+> cgFunName (MN 0 "runMain") <+> "in" <+> "world")
     ]
 
 -- Declarations and Expressions ------------------------------------------------
@@ -85,7 +69,7 @@ cgConstructors decls =
 cgCtor :: DDecl -> Doc
 cgCtor (DConstructor name _tag arity) =
     --FIXME strictness
-    char '|' <+> cgName name <+> hsep (replicate arity "Idris_Value")
+    char '|' <+> cgConName name <+> hsep (replicate arity "Idris_Value")
 
 cgFunctions :: [(Name, DDecl)] -> Doc
 cgFunctions = vsep . map (cgFun . snd)
@@ -94,17 +78,17 @@ cgFun :: DDecl -> Doc
 cgFun (DFun name args def) =
     blank <$>
     "///" <+> string (show name) <$>
-    cgName name <+> hsep (map cgName args) <+> char '=' <$>
+    cgFunName name <+> hsep (map cgVarName args) <+> char '=' <$>
     indent indentlevel (cgExp def)
 
 cgExp :: DExp -> Doc
 cgExp (DV var) =
     cgVar var
 cgExp (DApp _istail name args) =
-    cgApp name args
+    cgApp (cgFunName name) args
 cgExp (DLet name def rest) =
     --FIXME should be strict always?
-    "let" <+> cgName name <+> char '=' <+> cgExp def <+> "in" <$>
+    "let" <+> cgVarName name <+> char '=' <+> cgExp def <+> "in" <$>
     indent 4 (cgExp rest) <$>
     blank
 cgExp (DUpdate var def) =
@@ -113,7 +97,7 @@ cgExp (DProj def idx) =
     cgExp def <+> brackets (int idx)
 cgExp (DC _reloc _tag name args) =
     --FIXME optimize to Int for argless ctors
-    cgApp name args
+    cgApp (cgConName name) args
 cgExp (DCase _casetype exp alts) =
     cgCase exp alts
 cgExp (DChkCase exp alts) =
@@ -121,8 +105,9 @@ cgExp (DChkCase exp alts) =
 cgExp (DConst const) =
     cgConst const
 cgExp (DOp prim exps) =
-    cgPrim prim (map cgExp exps)
+    cgPrim prim exps
 cgExp DNothing =
+    --FIXME just Unit?
     cgUnsupported "nothing" ()
 cgExp (DError msg) =
     "abort" <+> dquotes (string msg)
@@ -137,19 +122,18 @@ cgCase exp alts =
 
 cgAlt :: DAlt -> Doc
 cgAlt (DConCase _tag name args exp) =
-    cgName name <+> hsep (map cgName args) <+> "->" <+> cgExp exp
+    cgConName name <+> hsep (map cgVarName args) <+> "->" <+> cgExp exp
 cgAlt (DConstCase const exp) =
     cgConst const <+> "->" <+> cgExp exp
 cgAlt (DDefaultCase exp) =
     char '_' <+> "->" <+> cgExp exp
 
-cgApp :: Name -> [DExp] -> Doc
-cgApp name args = call (mangle name) (map cgExp args)
-
 -- Constants and Primitives ----------------------------------------------------
 
 cgConst :: Const -> Doc
 cgConst (I i) = int i
+--FIXME to big...
+cgConst (BI i) = integer i
 cgConst (Fl d) = double d
 cgConst (Ch c) = squotes . string . cgEscape False $ c
 cgConst (Str s) = dquotes . string . concatMap (cgEscape True) $ s
@@ -164,97 +148,115 @@ cgEscape isString c
     | c <= '\xFF' = "\\x" ++ showHex (ord c) ""
     | otherwise = error $ "idris-codegen-clean: char " ++ show c ++ " is bigger than 255"
 
-cgPrim :: PrimFn -> [Doc] -> Doc
-cgPrim (LPlus _) = operator "+"
-cgPrim (LMinus _) = operator "-"
-cgPrim (LTimes _) = operator "*"
-cgPrim (LUDiv _) = operator "/"
-cgPrim (LSDiv _) = operator "/"
-cgPrim (LURem _) = operator "rem"
-cgPrim (LSRem _) = operator "rem"
+cgPrim :: PrimFn -> [DExp] -> Doc
+cgPrim (LPlus _) = cgOp "+"
+cgPrim (LMinus _) = cgOp "-"
+cgPrim (LTimes _) = cgOp "*"
+cgPrim (LUDiv _) = cgOp "/"
+cgPrim (LSDiv _) = cgOp "/"
+cgPrim (LURem _) = cgOp "rem"
+cgPrim (LSRem _) = cgOp "rem"
 
-cgPrim (LAnd _) = operator "bitand"
-cgPrim (LOr _) = operator "bitor"
-cgPrim (LXOr _) = operator "bitxor"
-cgPrim (LSHL _) = operator "<<"
-cgPrim (LASHR _) = operator ">>"
-cgPrim (LLSHR _) = operator ">>"  --FIXME
+cgPrim (LAnd _) = cgOp "bitand"
+cgPrim (LOr _) = cgOp "bitor"
+cgPrim (LXOr _) = cgOp "bitxor"
+cgPrim (LSHL _) = cgOp "<<"
+cgPrim (LASHR _) = cgOp ">>"
+cgPrim (LLSHR _) = cgOp ">>"  --FIXME
 --cgPrim (LCompl _) = \[x] -> text "~" <> x
 
-cgPrim (LEq _) = operator "=="
-cgPrim (LLt _) = operator "<"
-cgPrim (LSLt _) = operator "<"
-cgPrim (LLe _) = operator "<="
-cgPrim (LSLe _) = operator "<="
-cgPrim (LGt _) = operator ">"
-cgPrim (LSGt _) = operator ">"
-cgPrim (LGe _) = operator ">="
-cgPrim (LSGe _) = operator ">="
+cgPrim (LEq _) = cgOp "=="
+cgPrim (LLt _) = cgOp "<"
+cgPrim (LSLt _) = cgOp "<"
+cgPrim (LLe _) = cgOp "<="
+cgPrim (LSLe _) = cgOp "<="
+cgPrim (LGt _) = cgOp ">"
+cgPrim (LSGt _) = cgOp ">"
+cgPrim (LGe _) = cgOp ">="
+cgPrim (LSGe _) = cgOp ">="
 
 -- cgPrim (LSExt _ _) = head
 -- cgPrim (LZExt _ _) = head
 -- cgPrim (LTrunc _ _) = head
 -- cgPrim (LBitCast _ _) = head
 
-cgPrim (LChInt _) = call "toInt"
-cgPrim (LIntCh _) = call "fromInt"
+cgPrim (LChInt _) = cgApp "toInt"
+cgPrim (LIntCh _) = cgApp "fromInt"
 
-cgPrim (LIntStr _) = call "toString"
-cgPrim (LStrInt _) = call "fromString"
-cgPrim LStrConcat = operator "+++"
-cgPrim LStrLt = operator "<"
-cgPrim LStrEq = operator "=="
+cgPrim (LIntStr _) = cgApp "toString"
+cgPrim (LStrInt _) = cgApp "fromString"
+cgPrim LStrConcat = cgOp "+++"
+cgPrim LStrLt = cgOp "<"
+cgPrim LStrEq = cgOp "=="
 
---cgPrim  LStrRev    = call "reverse"
---cgPrim  LStrCons   = call "cons"
+--cgPrim  LStrRev    = cgApp "reverse"
+--cgPrim  LStrCons   = cgApp "cons"
 --cgPrim  LStrHead   = \[x] -> x ! "0"
 --cgPrim  LStrTail   = \[x] -> x ! "1:"
 --cgPrim  LStrIndex  = \[x,i] -> x <> brackets i
 --cgPrim  LStrLen    = cgPFun "len"
---cgPrim LStrSubstr = \[ofs,len,s] -> s <> brackets (ofs <> colon <> operator "+" [ofs,len])
+--cgPrim LStrSubstr = \[ofs,len,s] -> s <> brackets (ofs <> colon <> cgOp "+" [ofs,len])
 
 cgPrim LWriteStr = \[_world, str] ->
-    "fwrites" <+> str <+> "stdio" <$>
+    "fwrites" <+> cgExp str <+> "stdio" <$>
     "fwrites" <+> dquotes (text "\\n") <+> "stdio"
 cgPrim LReadStr = \[_world] ->
     "freadline" <+> "stdio"
 
 --cgPrim (LExternal n) = cgExtern $ show n
 
-cgPrim (LIntFloat _) = call "toReal"
-cgPrim (LFloatInt _) = call "fromReal"
-cgPrim LFloatStr = call "toString"
-cgPrim LStrFloat = call "fromString"
+cgPrim (LIntFloat _) = cgApp "toReal"
+cgPrim (LFloatInt _) = cgApp "fromReal"
+cgPrim LFloatStr = cgApp "toString"
+cgPrim LStrFloat = cgApp "fromString"
 
-cgPrim LFExp = call "exp"
-cgPrim LFLog = call "log"
-cgPrim LFSin = call "sin"
-cgPrim LFCos = call "cos"
-cgPrim LFTan = call "tan"
-cgPrim LFASin = call "asin"
-cgPrim LFACos = call "acos"
-cgPrim LFATan = call "atan"
-cgPrim LFSqrt = call "sqrt"
-cgPrim LFFloor = call "floor"
-cgPrim LFCeil  = call "ceil"
-cgPrim LFNegate = call "~" -- \[x] -> text "~" <> x
+cgPrim LFExp = cgApp "exp"
+cgPrim LFLog = cgApp "log"
+cgPrim LFSin = cgApp "sin"
+cgPrim LFCos = cgApp "cos"
+cgPrim LFTan = cgApp "tan"
+cgPrim LFASin = cgApp "asin"
+cgPrim LFACos = cgApp "acos"
+cgPrim LFATan = cgApp "atan"
+cgPrim LFSqrt = cgApp "sqrt"
+cgPrim LFFloor = cgApp "floor"
+cgPrim LFCeil  = cgApp "ceil"
+cgPrim LFNegate = cgApp "~" -- \[x] -> text "~" <> x
 
 cgPrim f = \_args -> cgUnsupported "primitive" f
 
 -- Names -----------------------------------------------------------------------
 
+cgApp, cgOp :: Doc -> [DExp] -> Doc
+cgApp fun args = parens $ fun <+> hsep (map cgExp args)
+cgOp op [left, right] = parens $ cgExp left <+> op <+> cgExp right
+
 cgVar :: LVar -> Doc
 cgVar (Loc idx) = cgLoc idx --FIXME not in ir?
-cgVar (Glob name) = cgName name
+cgVar (Glob name) = cgVarName name
 
 cgLoc :: Int -> Doc
-cgLoc idx = "loc" <> int idx
+cgLoc idx = "x" <> int idx
 
-cgName :: Name -> Doc
-cgName = text . mangle
+cgFunName, cgConName, cgVarName :: Name -> Doc
+cgFunName name = "idris_" <> text (mangle name)
+cgConName name = "Idris_" <> text (mangle name)
+cgVarName = text . mangle
+
+mangle :: Name -> Text
+mangle name = pack $ concatMap mangleChar (showCG name)
+    where
+        mangleChar c
+            | isIdent c = [c]
+            | isSep c = "_"
+            | isBrace c = ""
+            | otherwise = "_" ++ show (fromEnum c) ++ "_"
+        isIdent c = isAlpha c || isDigit c || c == '_'
+        isSep c = c == '.'
+        isBrace c = c == '{' || c == '}'
 
 -- Unsupported -----------------------------------------------------------------
 
 cgUnsupported :: Show a => Text -> a -> Doc
 cgUnsupported cat val =
-    call "abort" [dquotes $ "UNSUPPORTED" <+> text (toUpper cat) <+> string (show val)]
+    parens $ "abort" <+> hsep [dquotes $ "UNSUPPORTED" <+> text (toUpper cat) <+> string (show val)]
