@@ -21,14 +21,17 @@ import Text.PrettyPrint.Leijen.Text hiding (string)
 
 -- Helpers ---------------------------------------------------------------------
 
-indentlevel :: Int
-indentlevel = 4
+level :: Int
+level = 4
 
 blank :: Doc
 blank = space
 
 string :: String -> Doc
 string = text . pack
+
+deline :: String -> String
+deline = map (\c -> if c == '\n' then ' ' else c)
 
 -- Main and Prelude ------------------------------------------------------------
 
@@ -38,6 +41,7 @@ codegenClean info = do
     let output = vsep
             [ cgModule (takeBaseName $ outputFile info)
             , cgImports
+            , cgHelpers
             , cgConstructors ctors
             , cgFunctions funcs
             , cgStart
@@ -50,13 +54,19 @@ codegenClean info = do
 cgModule :: String -> Doc
 cgModule name = "module" <+> string name
 
-cgImports, cgStart :: Doc
+cgImports, cgHelpers, cgStart :: Doc
 cgImports = vsep $ map ("import" <+>)
     [ "StdEnv" ]
+cgHelpers = vsep
+    [ "unsafeCoerce :: a -> b"
+    , "unsafeCoerce x = code inline {"
+    , indent level "pop_a 0"
+    , "}"
+    ]
 cgStart = vsep
     [ "Start :: *World -> *World"
     , "Start world ="
-    , indent 4 ("let res =" <+> cgFunName (MN 0 "runMain") <+> "in" <+> "world")
+    , indent level ("let res =" <+> cgFunName (MN 0 "runMain") <+> "in" <+> "world")
     ]
 
 -- Declarations and Expressions ------------------------------------------------
@@ -67,8 +77,9 @@ cgConstructors decls =
     indent 4 (vsep $ map (cgCtor . snd) decls)
 
 cgCtor :: DDecl -> Doc
-cgCtor (DConstructor name _tag arity) =
+cgCtor (DConstructor name tag arity) =
     --FIXME strictness
+    "///" <+> string (show name) <+> parens (int tag) <$>
     char '|' <+> cgConName name <+> hsep (replicate arity "Idris_Value")
 
 cgFunctions :: [(Name, DDecl)] -> Doc
@@ -77,9 +88,10 @@ cgFunctions = vsep . map (cgFun . snd)
 cgFun :: DDecl -> Doc
 cgFun (DFun name args def) =
     blank <$>
-    "///" <+> string (show name) <$>
+    "///" <+> (string . show) name <$>
+    "///" <+> (string . deline . show) def <$>
     cgFunName name <+> hsep (map cgVarName args) <+> char '=' <$>
-    indent indentlevel (cgExp def)
+    indent level (cgExp def)
 
 cgExp :: DExp -> Doc
 cgExp (DV var) =
