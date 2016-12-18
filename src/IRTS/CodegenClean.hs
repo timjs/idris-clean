@@ -38,7 +38,7 @@ deline = map (\c -> if c == '\n' then ' ' else c)
 codegenClean :: CodeGenerator
 codegenClean info = do
     let (funcs, ctors) = partition isFun (defunDecls info)
-    let output = vsep
+    let output = vsep $ intersperse blank
             [ cgModule (takeBaseName $ outputFile info)
             , cgImports
             , cgHelpers
@@ -64,7 +64,7 @@ cgHelpers = vsep
     , "}"
     , blank
     , "nothing :: a"
-    , "nothing = abort \"NOTHING HITTED\""
+    , "nothing = abort \"HITTED NOTHING\""
     ]
 cgStart = vsep
     [ "Start :: *World -> *World"
@@ -110,9 +110,28 @@ cgExp (DUpdate var def) =
     cgUnsupported "update" (var, def)
 cgExp (DProj def idx) =
     cgExp def <+> brackets (int idx)
+-- Constructors: False, True
+cgExp (DC _ 0 name []) | name == falseName =
+    "False"
+cgExp (DC _ 1 name []) | name == trueName =
+    "True"
+-- Constructors: rest
 cgExp (DC _reloc _tag name args) =
     --FIXME optimize to Int for argless ctors
     cgApp (cgConName name) args
+-- Case: if-then-else
+cgExp (DCase _ test [DConCase 0 false [] elseAlt, DConCase 1 true  [] thenAlt]) | false == falseName && true == trueName =
+    cgIfThenElse test thenAlt elseAlt
+cgExp (DCase _ test [DConCase 1 true  [] thenAlt, DConCase 0 false [] elseAlt]) | false == falseName && true == trueName =
+    cgIfThenElse test thenAlt elseAlt
+cgExp (DCase _ test [DConCase 0 false [] elseAlt, DDefaultCase thenAlt ]) | false == falseName =
+    cgIfThenElse test thenAlt elseAlt
+cgExp (DCase _ test [DConCase 1 true  [] thenAlt, DDefaultCase elseAlt ]) | true == trueName =
+    cgIfThenElse test thenAlt elseAlt
+cgExp (DCase _ test [DConstCase _ thenAlt, DDefaultCase elseAlt]) =
+    cgIfThenElse test thenAlt elseAlt
+--cgExp (DCase _ test [t@SConstCase{}, e@SDefaultCase{}, SDefaultCase{}]) = emit (SCase Shared v [t, e])
+-- Case: rest
 cgExp (DCase _casetype exp alts) =
     cgCase exp alts
 cgExp (DChkCase exp alts) =
@@ -127,6 +146,14 @@ cgExp (DError msg) =
     "abort" <+> dquotes (string msg)
 cgExp e =
     cgUnsupported "expression" e
+
+cgIfThenElse :: DExp -> DExp -> DExp -> Doc
+cgIfThenElse test thenAlt elseAlt =
+    "if" <+> parens (cgExp test) <$>
+    indent level (
+        parens (cgExp thenAlt) <$>
+        parens(cgExp elseAlt)
+    )
 
 cgCase :: DExp -> [DAlt] -> Doc
 cgCase exp alts =
@@ -275,6 +302,10 @@ mangle name = concatMap mangleChar (showCG name)
         isIdent c = isAlpha c || isDigit c || c == '_'
         isSep c = c == '.'
         isBrace c = c == '{' || c == '}'
+
+falseName, trueName :: Name
+falseName = NS (UN "False") ["Bool", "Prelude"]
+trueName  = NS (UN "True")  ["Bool", "Prelude"]
 
 -- Unsupported -----------------------------------------------------------------
 
