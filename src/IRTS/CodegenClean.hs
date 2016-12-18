@@ -62,9 +62,6 @@ cgHelpers = vsep
     , "unsafeCoerce x = code inline {"
     , indent level "pop_a 0"
     , "}"
-    , blank
-    , "nothing :: a"
-    , "nothing = abort \"HITTED NOTHING\""
     ]
 cgStart = vsep
     [ "Start :: *World -> *World"
@@ -77,10 +74,10 @@ cgStart = vsep
 cgConstructors :: [(Name, DDecl)] -> Doc
 cgConstructors decls =
     ":: Idris_Value = Idris_Dummy_Value" <$>
-    indent 4 (vsep $ map (cgCtor . snd) decls)
+    indent level (vsep $ map (cgCon . snd) decls)
 
-cgCtor :: DDecl -> Doc
-cgCtor (DConstructor name tag arity) =
+cgCon :: DDecl -> Doc
+cgCon (DConstructor name tag arity) =
     --FIXME strictness
     "///" <+> string (show name) <+> parens (int tag) <$>
     char '|' <+> cgConName name <+> hsep (replicate arity "Idris_Value")
@@ -104,10 +101,10 @@ cgExp (DApp _istail name args) =
 cgExp (DLet name def rest) =
     --FIXME should be strict always?
     "let" <+> cgVarName name <+> char '=' <+> cgExp def <+> "in" <$>
-    indent 4 (cgExp rest) <$>
+    indent level (cgExp rest) <$>
     blank
 cgExp (DUpdate var def) =
-    cgUnsupported "update" (var, def)
+    cgUnsupported "UPDATE" (var, def)
 cgExp (DProj def idx) =
     cgExp def <+> brackets (int idx)
 -- Constructors: False, True
@@ -141,11 +138,11 @@ cgExp (DConst const) =
 cgExp (DOp prim exps) =
     cgPrim prim exps
 cgExp DNothing =
-    "nothing"
+    cgUnsupported "NOTHING" ()
 cgExp (DError msg) =
     "abort" <+> dquotes (string msg)
 cgExp e =
-    cgUnsupported "expression" e
+    cgUnsupported "EXPRESSION" e
 
 cgIfThenElse :: DExp -> DExp -> DExp -> Doc
 cgIfThenElse test thenAlt elseAlt =
@@ -159,7 +156,7 @@ cgCase :: DExp -> [DAlt] -> Doc
 cgCase exp alts =
     -- parens for `case` in `case`
     "case" <+> parens (cgExp exp) <+> "of" <$>
-    indent 4 (vsep (map cgAlt alts))
+    indent level (vsep (map cgAlt alts))
 
 cgAlt :: DAlt -> Doc
 cgAlt (DConCase _tag name args exp) =
@@ -178,7 +175,7 @@ cgConst (BI i) = integer i
 cgConst (Fl d) = double d
 cgConst (Ch c) = squotes . string . cgEscape False $ c
 cgConst (Str s) = dquotes . string . concatMap (cgEscape True) $ s
-cgConst c = cgUnsupported "constant" c
+cgConst c = cgUnsupported "CONSTANT" c
 
 cgEscape :: Bool -> Char -> String
 cgEscape True '"' = "\\\""
@@ -264,7 +261,7 @@ cgPrim LFFloor = cgApp "floor"
 cgPrim LFCeil  = cgApp "ceil"
 cgPrim LFNegate = cgApp "~" -- \[x] -> text "~" <> x
 
-cgPrim f = \_args -> cgUnsupported "primitive" f
+cgPrim f = \_args -> cgUnsupported "PRIMITIVE" f
 
 -- Names -----------------------------------------------------------------------
 
@@ -310,5 +307,5 @@ trueName  = NS (UN "True")  ["Bool", "Prelude"]
 -- Unsupported -----------------------------------------------------------------
 
 cgUnsupported :: Show a => Text -> a -> Doc
-cgUnsupported cat val =
-    parens $ "abort" <+> hsep [dquotes $ "UNSUPPORTED" <+> text cat <+> string (show val)]
+cgUnsupported msg val =
+    parens $ "abort" <+> hsep [dquotes $ text msg <+> string (show val) <+> "IS UNSUPPORTED"]
