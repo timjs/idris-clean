@@ -128,8 +128,8 @@ cgExp (DCase _ test [DConCase 0 false [] elseAlt, DDefaultCase thenAlt ]) | fals
     cgIfThenElse test thenAlt elseAlt
 cgExp (DCase _ test [DConCase 1 true  [] thenAlt, DDefaultCase elseAlt ]) | true == trueName =
     cgIfThenElse test thenAlt elseAlt
-cgExp (DCase _ test [DConstCase _ thenAlt, DDefaultCase elseAlt]) =
-    cgIfThenElse test thenAlt elseAlt
+--cgExp (DCase _ test [DConstCase _ thenAlt, DDefaultCase elseAlt]) =
+    --cgIfThenElse test thenAlt elseAlt
 --cgExp (DCase _ test [t@SConstCase{}, e@SDefaultCase{}, SDefaultCase{}]) = emit (SCase Shared v [t, e])
 -- Case: rest
 cgExp (DCase _casetype exp alts) =
