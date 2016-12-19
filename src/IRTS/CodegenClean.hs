@@ -96,16 +96,20 @@ cgCon :: DDecl -> Doc
 cgCon (DConstructor name tag arity) =
     --FIXME strictness
     "///" <+> string (show name) <+> parens (int tag) <$>
-    char '|' <+> cgConName name <+> hsep (replicate arity "Value")
+    char '|' <+> cgConName name <+> hsep (replicate arity "!Value")
 
 cgFunctions :: [(Name, DDecl)] -> Doc
 cgFunctions = vsep . map (cgFun . snd)
 
 cgFun :: DDecl -> Doc
 cgFun (DFun name args def) =
+    let arity = length args in
     blank <$>
     "///" <+> (string . show) name <$>
     "///" <+> (string . deline . show) def <$>
+    cgFunName name <+> "::" <+> (if arity > 0
+        then hsep (replicate arity "!Value") <+> "->"
+        else empty) <+> "Value" <$>
     cgFunName name <+> hsep (map cgVarName args) <+> char '=' <$>
     indent (cgExp def)
 
