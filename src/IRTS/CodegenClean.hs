@@ -78,6 +78,22 @@ cgPredefined = vsep
     , "unbox_Int (Boxed_Int x) :== x"
     , "unbox_Real (Boxed_Real x) :== x"
     , "unbox_String (Boxed_String x) :== x"
+    , blank
+    , "write_string :: !String -> Value"
+    , "write_string str | write_to_stdout str = Nothing"
+    , blank
+    , "write_to_stdout :: !String -> Bool"
+    , "write_to_stdout str = code inline {"
+    , indent ".d 1 0"
+    , indent $ indent "jsr stdioF"
+    , indent ".o 1 2 f"
+    , indent ".d 1 2 f"
+    , indent $ indent "jsr writeFS"
+    , indent ".o 0 2 f"
+    , indent ".d 0 2 f"
+    , indent $ indent "jsr closeF"
+    , indent ".o 0 1 b"
+    , "}"
     ]
 cgStart = vsep
     [ "Start =" <+> cgFunName (MN 0 "runMain") ]
@@ -239,7 +255,7 @@ cgPrim LStrConcat  = cgDeboxOp BString "+++"
 cgPrim LStrLt      = cgReboxOp BString BBool "<"
 cgPrim LStrEq      = cgReboxOp BString BBool "=="
 
---cgPrim  LStrRev    = cgApp "reverse"
+cgPrim  LStrRev    = cgDeboxApp BString "(toString o reverse o fromString)"
 --cgPrim  LStrCons   = cgApp "cons"
 --cgPrim  LStrHead   = \[x] -> x ! "0"
 --cgPrim  LStrTail   = \[x] -> x ! "1:"
@@ -248,20 +264,20 @@ cgPrim LStrEq      = cgReboxOp BString BBool "=="
 --cgPrim LStrSubstr = \[ofs,len,s] -> s <> brackets (ofs <> colon <> cgOp "+" [ofs,len])
 
 cgPrim LWriteStr = \[_world, str] ->
-    "let res = fwrites" <+> cgExp str <+> "stdio in Nothing"
+    prefixf "write_string" [cgUnbox BString $ cgExp str]
 --cgPrim LReadStr = \[_world] ->
     --"freadline" <+> "stdio"
 
 --cgPrim (LExternal n) = cgExtern $ show n
 
 cgPrim (LChInt ty)    = cgReboxApp BChar (cgITy ty) "toInt"
-cgPrim (LIntCh ty)    = cgReboxApp (cgITy ty) BChar "fromInt"
+cgPrim (LIntCh ty)    = cgReboxApp (cgITy ty) BChar "toChar"
 cgPrim (LIntStr ty)   = cgReboxApp (cgITy ty) BString "toString"
-cgPrim (LStrInt ty)   = cgReboxApp BString (cgITy ty) "fromString"
+cgPrim (LStrInt ty)   = cgReboxApp BString (cgITy ty) "toInt"
 cgPrim (LIntFloat ty) = cgReboxApp (cgITy ty) BReal "toReal"
-cgPrim (LFloatInt ty) = cgReboxApp BReal (cgITy ty) "fromReal"
+cgPrim (LFloatInt ty) = cgReboxApp BReal (cgITy ty) "toInt"
 cgPrim LFloatStr      = cgReboxApp BReal BString "toString"
-cgPrim LStrFloat      = cgReboxApp BString BReal "fromString"
+cgPrim LStrFloat      = cgReboxApp BString BReal "toReal"
 
 cgPrim LFExp    = cgDeboxApp BReal "exp"
 cgPrim LFLog    = cgDeboxApp BReal "log"
