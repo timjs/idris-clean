@@ -65,7 +65,7 @@ cgImports, cgPredefined, cgStart :: Doc
 cgImports = vsep $ map ("import" <+>)
     [ "StdEnv" ]
 cgPredefined = vsep
-    [ ":: Value = Dummy"
+    [ ":: Value = Nothing"
     , indent "| Boxed_Bool !Bool"
     , indent "| Boxed_Char !Char"
     , indent "| Boxed_Int !Int"
@@ -80,10 +80,7 @@ cgPredefined = vsep
     , "unbox_String (Boxed_String x) :== x"
     ]
 cgStart = vsep
-    [ "Start :: *World -> *World"
-    , "Start world ="
-    , indent ("let res =" <+> cgFunName (MN 0 "runMain") <+> "in" <+> "world")
-    ]
+    [ "Start =" <+> cgFunName (MN 0 "runMain") ]
 
 -- Declarations and Expressions ------------------------------------------------
 
@@ -158,7 +155,7 @@ cgExp (DConst const) =
 cgExp (DOp prim exps) =
     cgPrim prim exps
 cgExp DNothing =
-    cgUnsupported "NOTHING" ()
+    "Nothing" --cgUnsupported "NOTHING" ()
 cgExp (DError msg) =
     "abort" <+> dquotes (string msg)
 cgExp e =
@@ -175,7 +172,7 @@ cgIfThenElse test thenAlt elseAlt =
 cgCase :: DExp -> [DAlt] -> Doc
 cgCase exp alts =
     -- parens for `case` in `case`
-    "case" <+> parens (cgExp exp) <+> "of" <$>
+    parens $ "case" <+> cgExp exp <+> "of" <$>
     indent (vsep (map cgAlt alts))
 
 cgAlt :: DAlt -> Doc
@@ -251,10 +248,9 @@ cgPrim LStrEq      = cgReboxOp BString BBool "=="
 --cgPrim LStrSubstr = \[ofs,len,s] -> s <> brackets (ofs <> colon <> cgOp "+" [ofs,len])
 
 cgPrim LWriteStr = \[_world, str] ->
-    "fwrites" <+> cgExp str <+> "stdio" <$>
-    "fwrites" <+> dquotes (text "\\n") <+> "stdio"
-cgPrim LReadStr = \[_world] ->
-    "freadline" <+> "stdio"
+    "let res = fwrites" <+> cgExp str <+> "stdio in Nothing"
+--cgPrim LReadStr = \[_world] ->
+    --"freadline" <+> "stdio"
 
 --cgPrim (LExternal n) = cgExtern $ show n
 
