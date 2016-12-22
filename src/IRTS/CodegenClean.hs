@@ -31,8 +31,9 @@ string = text . pack
 blank :: Doc
 blank = space
 
-deline :: String -> String
+deline, dequote :: String -> String
 deline = map (\c -> if c == '\n' then ' ' else c)
+dequote = map (\c -> if c == '"' then '\'' else c)
 
 prefixf, infixf :: Doc -> [Doc] -> Doc
 prefixf fun args = parens $
@@ -210,13 +211,17 @@ cgAlt (DDefaultCase exp) =
 -- Constants and Primitives ----------------------------------------------------
 
 cgConst :: Const -> Doc
-cgConst (I i) = cgBox BInt $ int i
---FIXME to big...
-cgConst (BI i) = cgBox BInt $ integer i
-cgConst (Fl d) = cgBox BReal $ double d
-cgConst (Ch c) = cgBox BChar $ squotes . string . cgEscape False $ c
+cgConst (I i)   = cgBox BInt $ int i
+cgConst (BI i)  = cgBox BInt $ integer i --FIXME to big...
+-- Translate all bit types to `BInt`, Clean doesn't have different integer sizes.
+cgConst (B8 i)  = cgBox BInt . string . show $ i
+cgConst (B16 i) = cgBox BInt . string . show $ i
+cgConst (B32 i) = cgBox BInt . string . show $ i
+cgConst (B64 i) = cgBox BInt . string . show $ i
+cgConst (Fl d)  = cgBox BReal $ double d
+cgConst (Ch c)  = cgBox BChar $ squotes . string . cgEscape False $ c
 cgConst (Str s) = cgBox BString $ dquotes . string . concatMap (cgEscape True) $ s
-cgConst c = cgUnsupported "CONSTANT" c
+cgConst c       = cgUnsupported "CONSTANT" c
 
 cgEscape :: Bool -> Char -> String
 cgEscape True '"' = "\\\""
@@ -254,10 +259,11 @@ cgPrim (LSGt   ty) = cgReboxOp (cgATy ty) BBool ">"
 cgPrim (LGe    ty) = cgReboxOp (cgITy ty) BBool ">="
 cgPrim (LSGe   ty) = cgReboxOp (cgATy ty) BBool ">="
 
-cgPrim (LSExt _ _) = cgApp "id"
--- cgPrim (LZExt _ _) = head
--- cgPrim (LTrunc _ _) = head
--- cgPrim (LBitCast _ _) = head
+--XXX Only Char to Int and Int to Char? Rest is 64bit on 64bit machines...
+cgPrim (LSExt _ _)    = cgApp "id"
+cgPrim (LZExt _ _)    = cgApp "id"
+cgPrim (LBitCast _ _) = cgApp "id"
+cgPrim (LTrunc _ _)   = cgApp "id"
 
 cgPrim LStrConcat  = cgDeboxOp BString "+++"
 cgPrim LStrLt      = cgReboxOp BString BBool "<"
@@ -326,11 +332,14 @@ instance Pretty BoxedTy where
     pretty BReal = "Real"
     pretty BString = "String"
 
+-- Translate all `IntTy`s to `BInt` except for characters.
+-- FIXME No good for `Integer`, but it it used as an intermediate result in
+-- multiple basic Idris functions like `String` lengths etc.
 cgITy :: IntTy -> BoxedTy
 cgITy ITNative = BInt
 cgITy ITBig = BInt
 cgITy ITChar = BChar
-cgITy (ITFixed IT8) = BChar
+cgITy (ITFixed IT8) = BInt
 cgITy (ITFixed IT16) = BInt
 cgITy (ITFixed IT32) = BInt
 cgITy (ITFixed IT64) = BInt
@@ -388,4 +397,4 @@ trueName  = NS (UN "True")  ["Bool", "Prelude"]
 
 cgUnsupported :: Show a => Text -> a -> Doc
 cgUnsupported msg val =
-    parens $ "abort" <+> hsep [dquotes $ text msg <+> string (show val) <+> "IS UNSUPPORTED"]
+    parens $ "abort" <+> hsep [dquotes $ text msg <+> (string . dequote . show) val <+> "IS UNSUPPORTED"]
