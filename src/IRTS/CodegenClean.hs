@@ -79,6 +79,14 @@ cgPredefined = vsep
     , "unbox_Real (Boxed_Real x) :== x"
     , "unbox_String (Boxed_String x) :== x"
     , blank
+    , "clean_String_cons (Boxed_Char chr) (Boxed_String str) :== Boxed_String (toString chr +++ str)"
+    , "clean_String_reverse (Boxed_String str) :== Boxed_String (toString (reverse (fromString str)))"
+    , "clean_String_head (Boxed_String str) :== Boxed_Char (select str 0)"
+    , "clean_String_tail (Boxed_String str) :== Boxed_String (str % (1, size str - 1))"
+    , "clean_String_index (Boxed_String str) (Boxed_Int i) :== Boxed_Char (select str i)"
+    , "clean_String_len (Boxed_String str) :== Boxed_Int (size str)"
+    , "clean_String_substring (Boxed_Int ofs) (Boxed_Int len) (Boxed_String str) :== Boxed_String (str % (ofs, ofs + len))"
+    , blank
     , "write_string :: !String -> Value"
     , "write_string str | write_to_stdout str = Nothing"
     , blank
@@ -158,8 +166,8 @@ cgExp (DC _reloc _tag name args) =
 --     cgIfThenElse test thenAlt elseAlt
 -- cgExp (DCase _ test [DConCase 1 true  [] thenAlt, DDefaultCase elseAlt ]) | true == trueName =
 --     cgIfThenElse test thenAlt elseAlt
---cgExp (DCase _ test [DConstCase _ thenAlt, DDefaultCase elseAlt]) =
-    --cgIfThenElse test thenAlt elseAlt
+cgExp (DCase _ test [DConstCase (I 0) elseAlt, DDefaultCase thenAlt]) =
+    cgIfThenElse test thenAlt elseAlt
 --cgExp (DCase _ test [t@SConstCase{}, e@SDefaultCase{}, SDefaultCase{}]) = emit (SCase Shared v [t, e])
 -- Case: rest
 cgExp (DCase _casetype exp alts) =
@@ -179,7 +187,7 @@ cgExp e =
 
 cgIfThenElse :: DExp -> DExp -> DExp -> Doc
 cgIfThenElse test thenAlt elseAlt =
-    "if" <+> parens (cgExp test) <$>
+    "if" <+> cgUnbox BBool (cgExp test) <$>
     indent (
         parens (cgExp thenAlt) <$>
         parens (cgExp elseAlt)
@@ -246,7 +254,7 @@ cgPrim (LSGt   ty) = cgReboxOp (cgATy ty) BBool ">"
 cgPrim (LGe    ty) = cgReboxOp (cgITy ty) BBool ">="
 cgPrim (LSGe   ty) = cgReboxOp (cgATy ty) BBool ">="
 
--- cgPrim (LSExt _ _) = head
+cgPrim (LSExt _ _) = cgApp "id"
 -- cgPrim (LZExt _ _) = head
 -- cgPrim (LTrunc _ _) = head
 -- cgPrim (LBitCast _ _) = head
@@ -255,13 +263,13 @@ cgPrim LStrConcat  = cgDeboxOp BString "+++"
 cgPrim LStrLt      = cgReboxOp BString BBool "<"
 cgPrim LStrEq      = cgReboxOp BString BBool "=="
 
-cgPrim  LStrRev    = cgDeboxApp BString "(toString o reverse o fromString)"
---cgPrim  LStrCons   = cgApp "cons"
---cgPrim  LStrHead   = \[x] -> x ! "0"
---cgPrim  LStrTail   = \[x] -> x ! "1:"
---cgPrim  LStrIndex  = \[x,i] -> x <> brackets i
---cgPrim  LStrLen    = cgPFun "len"
---cgPrim LStrSubstr = \[ofs,len,s] -> s <> brackets (ofs <> colon <> cgOp "+" [ofs,len])
+cgPrim LStrRev    = cgApp "clean_String_reverse"
+cgPrim LStrCons   = cgApp "clean_String_cons"
+cgPrim LStrHead   = cgApp "clean_String_head"
+cgPrim LStrTail   = cgApp "clean_String_tail"
+cgPrim LStrIndex  = cgApp "clean_String_index"
+cgPrim LStrLen    = cgApp "clean_String_len"
+cgPrim LStrSubstr = cgApp "clean_String_substr"
 
 cgPrim LWriteStr = \[_world, str] ->
     prefixf "write_string" [cgUnbox BString $ cgExp str]
