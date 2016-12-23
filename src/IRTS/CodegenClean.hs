@@ -35,10 +35,10 @@ deline, dequote :: String -> String
 deline = map (\c -> if c == '\n' then ' ' else c)
 dequote = map (\c -> if c == '"' then '\'' else c)
 
-prefixf, infixf :: Doc -> [Doc] -> Doc
-prefixf fun args = parens $
+appPrefix, appInfix :: Doc -> [Doc] -> Doc
+appPrefix fun args = parens $
     fun <+> hsep args
-infixf op [left, right] = parens $
+appInfix op [left, right] = parens $
     left <+> op <+> right
 
 -- Main and Prelude ------------------------------------------------------------
@@ -88,11 +88,11 @@ cgPredefined = vsep
     , "clean_String_len (Boxed_String str) :== Boxed_Int (size str)"
     , "clean_String_substring (Boxed_Int ofs) (Boxed_Int len) (Boxed_String str) :== Boxed_String (str % (ofs, ofs + len))"
     , blank
-    , "write_string :: !String -> Value"
-    , "write_string str | write_to_stdout str = Nothing"
+    , "clean_IO_write_String world (Boxed_String str) | clean_IO_toStdout str :== Nothing"
+    , "clean_IO_read_String world :== Boxed_String clean_IO_fromStdin"
     , blank
-    , "write_to_stdout :: !String -> Bool"
-    , "write_to_stdout str = code inline {"
+    , "clean_IO_toStdout :: !String -> Bool"
+    , "clean_IO_toStdout str = code inline {"
     , indent ".d 1 0"
     , indent $ indent "jsr stdioF"
     , indent ".o 1 2 f"
@@ -102,6 +102,19 @@ cgPredefined = vsep
     , indent ".d 0 2 f"
     , indent $ indent "jsr closeF"
     , indent ".o 0 1 b"
+    , "}"
+    , "clean_IO_fromStdin :: String"
+    , "clean_IO_fromStdin = code inline {"
+    , indent ".d 0 0"
+    , indent $ indent "jsr stdioF"
+    , indent ".o 0 2 f"
+    , indent ".d 0 2 f"
+    , indent $ indent "jsr readLineF"
+    , indent ".o 1 2 f"
+    , indent ".d 1 2 f"
+    , indent $ indent "jsr closeF"
+    , indent ".o 1 1 b"
+    , indent "pop_b"
     , "}"
     ]
 cgStart = vsep
@@ -182,7 +195,7 @@ cgExp (DOp prim exps) =
 cgExp DNothing =
     "Nothing" --cgUnsupported "NOTHING" ()
 cgExp (DError msg) =
-    "abort" <+> dquotes (string msg)
+    appPrefix "abort" [dquotes $ string msg]
 cgExp e =
     cgUnsupported "EXPRESSION" e
 
@@ -233,20 +246,20 @@ cgEscape isString c
     | otherwise = error $ "idris-codegen-clean: char " ++ show c ++ " is bigger than 255"
 
 cgPrim :: PrimFn -> [DExp] -> Doc
-cgPrim (LPlus  ty) = cgDeboxOp (cgATy ty) "+"
-cgPrim (LMinus ty) = cgDeboxOp (cgATy ty) "-"
-cgPrim (LTimes ty) = cgDeboxOp (cgATy ty) "*"
-cgPrim (LSDiv  ty) = cgDeboxOp (cgATy ty) "/"
-cgPrim (LUDiv  ty) = cgDeboxOp (cgITy ty) "/"
-cgPrim (LSRem  ty) = cgDeboxOp (cgATy ty) "rem"
-cgPrim (LURem  ty) = cgDeboxOp (cgITy ty) "rem"
+cgPrim (LPlus  ty) = cgPrimOp (cgATy ty) "+"
+cgPrim (LMinus ty) = cgPrimOp (cgATy ty) "-"
+cgPrim (LTimes ty) = cgPrimOp (cgATy ty) "*"
+cgPrim (LSDiv  ty) = cgPrimOp (cgATy ty) "/"
+cgPrim (LUDiv  ty) = cgPrimOp (cgITy ty) "/"
+cgPrim (LSRem  ty) = cgPrimOp (cgATy ty) "rem"
+cgPrim (LURem  ty) = cgPrimOp (cgITy ty) "rem"
 
-cgPrim (LAnd   ty) = cgDeboxOp (cgITy ty) "bitand"
-cgPrim (LOr    ty) = cgDeboxOp (cgITy ty) "bitor"
-cgPrim (LXOr   ty) = cgDeboxOp (cgITy ty) "bitxor"
-cgPrim (LSHL   ty) = cgDeboxOp (cgITy ty) "<<"
-cgPrim (LASHR  ty) = cgDeboxOp (cgITy ty) ">>"
-cgPrim (LLSHR  ty) = cgDeboxOp (cgITy ty) ">>"  --FIXME
+cgPrim (LAnd   ty) = cgPrimOp (cgITy ty) "bitand"
+cgPrim (LOr    ty) = cgPrimOp (cgITy ty) "bitor"
+cgPrim (LXOr   ty) = cgPrimOp (cgITy ty) "bitxor"
+cgPrim (LSHL   ty) = cgPrimOp (cgITy ty) "<<"
+cgPrim (LASHR  ty) = cgPrimOp (cgITy ty) ">>"
+cgPrim (LLSHR  ty) = cgPrimOp (cgITy ty) ">>"  --FIXME
 --cgPrim (LCompl _) = \[x] -> text "~" <> x
 
 cgPrim (LEq    ty) = cgReboxOp (cgATy ty) BBool "=="
@@ -265,9 +278,9 @@ cgPrim (LZExt _ _)    = cgApp "id"
 cgPrim (LBitCast _ _) = cgApp "id"
 cgPrim (LTrunc _ _)   = cgApp "id"
 
-cgPrim LStrConcat  = cgDeboxOp BString "+++"
-cgPrim LStrLt      = cgReboxOp BString BBool "<"
-cgPrim LStrEq      = cgReboxOp BString BBool "=="
+cgPrim LStrConcat = cgPrimOp BString "+++"
+cgPrim LStrLt     = cgReboxOp BString BBool "<"
+cgPrim LStrEq     = cgReboxOp BString BBool "=="
 
 cgPrim LStrRev    = cgApp "clean_String_reverse"
 cgPrim LStrCons   = cgApp "clean_String_cons"
@@ -277,46 +290,41 @@ cgPrim LStrIndex  = cgApp "clean_String_index"
 cgPrim LStrLen    = cgApp "clean_String_len"
 cgPrim LStrSubstr = cgApp "clean_String_substr"
 
-cgPrim LWriteStr = \[_world, str] ->
-    prefixf "write_string" [cgUnbox BString $ cgExp str]
---cgPrim LReadStr = \[_world] ->
-    --"freadline" <+> "stdio"
+cgPrim LWriteStr = cgApp "clean_IO_write_String"
+cgPrim LReadStr = cgApp "clean_IO_read_String"
 
 --cgPrim (LExternal n) = cgExtern $ show n
 
-cgPrim (LChInt ty)    = cgReboxApp BChar (cgITy ty) "toInt"
-cgPrim (LIntCh ty)    = cgReboxApp (cgITy ty) BChar "toChar"
-cgPrim (LIntStr ty)   = cgReboxApp (cgITy ty) BString "toString"
-cgPrim (LStrInt ty)   = cgReboxApp BString (cgITy ty) "toInt"
-cgPrim (LIntFloat ty) = cgReboxApp (cgITy ty) BReal "toReal"
-cgPrim (LFloatInt ty) = cgReboxApp BReal (cgITy ty) "toInt"
-cgPrim LFloatStr      = cgReboxApp BReal BString "toString"
-cgPrim LStrFloat      = cgReboxApp BString BReal "toReal"
+cgPrim (LChInt ty)    = cgReboxFn BChar (cgITy ty) "toInt"
+cgPrim (LIntCh ty)    = cgReboxFn (cgITy ty) BChar "toChar"
+cgPrim (LIntStr ty)   = cgReboxFn (cgITy ty) BString "toString"
+cgPrim (LStrInt ty)   = cgReboxFn BString (cgITy ty) "toInt"
+cgPrim (LIntFloat ty) = cgReboxFn (cgITy ty) BReal "toReal"
+cgPrim (LFloatInt ty) = cgReboxFn BReal (cgITy ty) "toInt"
+cgPrim LFloatStr      = cgReboxFn BReal BString "toString"
+cgPrim LStrFloat      = cgReboxFn BString BReal "toReal"
 
-cgPrim LFExp    = cgDeboxApp BReal "exp"
-cgPrim LFLog    = cgDeboxApp BReal "log"
-cgPrim LFSin    = cgDeboxApp BReal "sin"
-cgPrim LFCos    = cgDeboxApp BReal "cos"
-cgPrim LFTan    = cgDeboxApp BReal "tan"
-cgPrim LFASin   = cgDeboxApp BReal "asin"
-cgPrim LFACos   = cgDeboxApp BReal "acos"
-cgPrim LFATan   = cgDeboxApp BReal "atan"
-cgPrim LFSqrt   = cgDeboxApp BReal "sqrt"
-cgPrim LFFloor  = cgDeboxApp BReal "floor"
-cgPrim LFCeil   = cgDeboxApp BReal "ceil"
-cgPrim LFNegate = cgDeboxApp BReal "~" -- \[x] -> text "~" <> x
+cgPrim LFExp    = cgPrimFn BReal "exp"
+cgPrim LFLog    = cgPrimFn BReal "log"
+cgPrim LFSin    = cgPrimFn BReal "sin"
+cgPrim LFCos    = cgPrimFn BReal "cos"
+cgPrim LFTan    = cgPrimFn BReal "tan"
+cgPrim LFASin   = cgPrimFn BReal "asin"
+cgPrim LFACos   = cgPrimFn BReal "acos"
+cgPrim LFATan   = cgPrimFn BReal "atan"
+cgPrim LFSqrt   = cgPrimFn BReal "sqrt"
+cgPrim LFFloor  = cgReboxFn BReal BInt "entier"
+--cgPrim LFCeil   = cgReboxFn BReal BInt "ceil"
+cgPrim LFNegate = cgPrimFn BReal "~" -- \[x] -> text "~" <> x
 
 cgPrim f = \_args -> cgUnsupported "PRIMITIVE" f
 
-cgDeboxApp, cgDeboxOp :: BoxedTy -> Doc -> [DExp] -> Doc
-cgDeboxApp ty = cgReboxApp ty ty
-cgDeboxOp ty = cgReboxOp ty ty
-cgReboxApp, cgReboxOp :: BoxedTy -> BoxedTy -> Doc -> [DExp] -> Doc
-cgReboxApp = cgRebox prefixf
-cgReboxOp = cgRebox infixf
-
-cgRebox :: (Doc -> [Doc] -> Doc) -> BoxedTy -> BoxedTy -> Doc -> [DExp] -> Doc
-cgRebox app from to fun = cgBox to . app fun . map (cgUnbox from . cgExp)
+cgPrimFn, cgPrimOp :: BoxedTy -> Doc -> [DExp] -> Doc
+cgPrimFn ty = cgReboxFn ty ty
+cgPrimOp ty = cgReboxOp ty ty
+cgReboxFn, cgReboxOp :: BoxedTy -> BoxedTy -> Doc -> [DExp] -> Doc
+cgReboxFn = cgRebox appPrefix
+cgReboxOp = cgRebox appInfix
 
 data BoxedTy
     = BBool
@@ -351,12 +359,14 @@ cgATy (ATInt ity) = cgITy ity
 -- Names & Applications --------------------------------------------------------
 
 cgBox, cgUnbox :: BoxedTy -> Doc -> Doc
-cgBox ty exp = prefixf ("Boxed_" <> pretty ty) [exp]
-cgUnbox ty exp = prefixf ("unbox_" <> pretty ty) [exp]
+cgBox ty exp = appPrefix ("Boxed_" <> pretty ty) [exp]
+cgUnbox ty exp = appPrefix ("unbox_" <> pretty ty) [exp]
 
-cgApp, cgOp :: Doc -> [DExp] -> Doc
-cgOp op [left, right] = infixf op [cgExp left, cgExp right]
-cgApp fun args = prefixf fun (map cgExp args)
+cgRebox :: (Doc -> [Doc] -> Doc) -> BoxedTy -> BoxedTy -> Doc -> [DExp] -> Doc
+cgRebox app from to fun = cgBox to . app fun . map (cgUnbox from . cgExp)
+
+cgApp :: Doc -> [DExp] -> Doc
+cgApp fun args = appPrefix fun (map cgExp args)
 
 cgVar :: LVar -> Doc
 cgVar (Loc idx) = cgLoc idx --FIXME not in ir?
@@ -397,4 +407,4 @@ trueName  = NS (UN "True")  ["Bool", "Prelude"]
 
 cgUnsupported :: Show a => Text -> a -> Doc
 cgUnsupported msg val =
-    parens $ "abort" <+> hsep [dquotes $ text msg <+> (string . dequote . show) val <+> "IS UNSUPPORTED"]
+    appPrefix "abort" [dquotes $ text msg <+> (string . dequote . show) val <+> "IS UNSUPPORTED"]
