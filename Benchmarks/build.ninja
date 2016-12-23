@@ -1,0 +1,17 @@
+include ../rules.ninja
+
+build fasta-id | fasta.ibc: idris fasta.idr
+build fasta.icl: idris-clean fasta.ibc
+build fasta-cl: clean fasta.icl
+
+build pidigits-id | pidigits.ibc: idris pidigits.idr
+build pidigits.icl: idris-clean pidigits.ibc
+build pidigits-cl: clean pidigits.icl
+
+# build quasigroups-id | quasigroups.ibc: idris quasigroups.idr
+# build quasigroups.icl: idris-clean quasigroups.ibc
+# build quasigroups-cl: clean quasigroups.icl
+
+build sortvec-id | sortvec.ibc: idris sortvec.idr
+build sortvec.icl: idris-clean sortvec.ibc
+build sortvec-cl: clean sortvec.icl

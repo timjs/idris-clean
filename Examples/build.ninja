@@ -1,0 +1,117 @@
+include ../rules.ninja
+
+build Bits32-id | Bits32.ibc: idris Bits32.idr
+build Bits32.icl: idris-clean Bits32.ibc
+build Bits32-cl: clean Bits32.icl
+
+build Chars-id | Chars.ibc: idris Chars.idr
+build Chars.icl: idris-clean Chars.ibc
+build Chars-cl: clean Chars.icl
+
+build Data-id | Data.ibc: idris Data.idr
+build Data.icl: idris-clean Data.ibc
+build Data-cl: clean Data.icl
+
+# build Delegates-id | Delegates.ibc: idris Delegates.idr
+# build Delegates.icl: idris-clean Delegates.ibc
+# build Delegates-cl: clean Delegates.icl
+
+build Doubles-id | Doubles.ibc: idris Doubles.idr
+build Doubles.icl: idris-clean Doubles.ibc
+build Doubles-cl: clean Doubles.icl
+
+# build EffectsTest-id | EffectsTest.ibc: idris EffectsTest.idr
+# build EffectsTest.icl: idris-clean EffectsTest.ibc
+# build EffectsTest-cl: clean EffectsTest.icl
+
+# build Enums-id | Enums.ibc: idris Enums.idr
+# build Enums.icl: idris-clean Enums.ibc
+# build Enums-cl: clean Enums.icl
+
+# build FFI-id | FFI.ibc: idris FFI.idr
+# build FFI.icl: idris-clean FFI.ibc
+# build FFI-cl: clean FFI.icl
+
+build Foldables-id | Foldables.ibc: idris Foldables.idr
+build Foldables.icl: idris-clean Foldables.ibc
+build Foldables-cl: clean Foldables.icl
+
+# build Generics-id | Generics.ibc: idris Generics.idr
+# build Generics.icl: idris-clean Generics.ibc
+# build Generics-cl: clean Generics.icl
+
+# build HashSet-id | HashSet.ibc: idris HashSet.idr
+# build HashSet.icl: idris-clean HashSet.ibc
+# build HashSet-cl: clean HashSet.icl
+
+build HelloWorld-id | HelloWorld.ibc: idris HelloWorld.idr
+build HelloWorld.icl: idris-clean HelloWorld.ibc
+build HelloWorld-cl: clean HelloWorld.icl
+
+build IfThenElse-id | IfThenElse.ibc: idris IfThenElse.idr
+build IfThenElse.icl: idris-clean IfThenElse.ibc
+build IfThenElse-cl: clean IfThenElse.icl
+
+build Ints-id | Ints.ibc: idris Ints.idr
+build Ints.icl: idris-clean Ints.ibc
+build Ints-cl: clean Ints.icl
+
+build Lists-id | Lists.ibc: idris Lists.idr
+build Lists.icl: idris-clean Lists.ibc
+build Lists-cl: clean Lists.icl
+
+# build Nullable-id | Nullable.ibc: idris Nullable.idr
+# build Nullable.icl: idris-clean Nullable.ibc
+# build Nullable-cl: clean Nullable.icl
+
+# build PrimitiveArrays-id | PrimitiveArrays.ibc: idris PrimitiveArrays.idr
+# build PrimitiveArrays.icl: idris-clean PrimitiveArrays.ibc
+# build PrimitiveArrays-cl: clean PrimitiveArrays.icl
+
+build Pythagoras-id | Pythagoras.ibc: idris Pythagoras.idr
+build Pythagoras.icl: idris-clean Pythagoras.ibc
+build Pythagoras-cl: clean Pythagoras.icl
+
+build Records-id | Records.ibc: idris Records.idr
+build Records.icl: idris-clean Records.ibc
+build Records-cl: clean Records.icl
+
+# build ReferenceTypeArrays-id | ReferenceTypeArrays.ibc: idris ReferenceTypeArrays.idr
+# build ReferenceTypeArrays.icl: idris-clean ReferenceTypeArrays.ibc
+# build ReferenceTypeArrays-cl: clean ReferenceTypeArrays.icl
+
+build Show-id | Show.ibc: idris Show.idr
+build Show.icl: idris-clean Show.ibc
+build Show-cl: clean Show.icl
+
+# build SinglePrimitives-id | SinglePrimitives.ibc: idris SinglePrimitives.idr
+# build SinglePrimitives.icl: idris-clean SinglePrimitives.ibc
+# build SinglePrimitives-cl: clean SinglePrimitives.icl
+
+build SortedSet-id | SortedSet.ibc: idris SortedSet.idr
+build SortedSet.icl: idris-clean SortedSet.ibc
+build SortedSet-cl: clean SortedSet.icl
+
+build Streams-id | Streams.ibc: idris Streams.idr
+build Streams.icl: idris-clean Streams.ibc
+build Streams-cl: clean Streams.icl
+
+build Strings-id | Strings.ibc: idris Strings.idr
+build Strings.icl: idris-clean Strings.ibc
+build Strings-cl: clean Strings.icl
+
+build StrInt-id | StrInt.ibc: idris StrInt.idr
+build StrInt.icl: idris-clean StrInt.ibc
+build StrInt-cl: clean StrInt.icl
+
+# build ValueTypeArrays-id | ValueTypeArrays.ibc: idris ValueTypeArrays.idr
+# build ValueTypeArrays.icl: idris-clean ValueTypeArrays.ibc
+# build ValueTypeArrays-cl: clean ValueTypeArrays.icl
+
+# build ValueTypeProperties-id | ValueTypeProperties.ibc: idris ValueTypeProperties.idr
+# build ValueTypeProperties.icl: idris-clean ValueTypeProperties.ibc
+# build ValueTypeProperties-cl: clean ValueTypeProperties.icl
+
+build Vector-id | Vector.ibc: idris Vector.idr
+build Vector.icl: idris-clean Vector.ibc
+build Vector-cl: clean Vector.icl

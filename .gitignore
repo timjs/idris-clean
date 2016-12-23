@@ -1,2 +1,6 @@
 dist/
-examples/
+
+**/*.ibc
+**/*.icl
+**/*-id
+**/*-cl

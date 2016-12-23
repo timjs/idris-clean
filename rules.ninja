@@ -1,0 +1,8 @@
+rule idris
+    command = idris -p contrib -p effects $in -o $out
+rule idris-clean
+    command = idris-codegen-clean $in -o $out
+rule idris-php
+    command = idris-codegen-php $in -o $out
+rule clean
+    command = clm -b -nt -h 209715200 $$(basename -s .icl $in) -o $out
