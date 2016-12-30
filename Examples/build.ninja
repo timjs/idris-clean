@@ -112,6 +112,6 @@ build StrInt-cl: clean StrInt.icl
 # build ValueTypeProperties.icl: idris-clean ValueTypeProperties.ibc
 # build ValueTypeProperties-cl: clean ValueTypeProperties.icl
 
-build Vector-id | Vector.ibc: idris Vector.idr
-build Vector.icl: idris-clean Vector.ibc
-build Vector-cl: clean Vector.icl
+# build Vector-id | Vector.ibc: idris Vector.idr
+# build Vector.icl: idris-clean Vector.ibc
+# build Vector-cl: clean Vector.icl
