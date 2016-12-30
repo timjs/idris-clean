@@ -15,3 +15,7 @@ build pidigits-cl: clean pidigits.icl
 build sortvec-id | sortvec.ibc: idris sortvec.idr
 build sortvec.icl: idris-clean sortvec.ibc
 build sortvec-cl: clean sortvec.icl
+
+build pythagoras-id | pythagoras.ibc: idris pythagoras.idr
+build pythagoras.icl: idris-clean pythagoras.ibc
+build pythagoras-cl: clean pythagoras.icl

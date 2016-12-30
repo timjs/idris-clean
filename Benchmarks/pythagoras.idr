@@ -1,8 +1,8 @@
 -- Shamelessly stolen from Edwin Brady
 module Main
 
-pythag : Int -> List (Int, Int, Int)
-pythag max = [
+pythagoras : Int -> List (Int, Int, Int)
+pythagoras max = [
     (x, y, z)
     | z <- [1..max]
     , y <- [1..z]
@@ -12,5 +12,5 @@ pythag max = [
 
 main : IO ()
 main = do
-  printLn $ pythag 100
-  printLn $ sort ["foo", "bar", "baz"]
+  [_, n] <- getArgs
+  printLn $ pythagoras (cast n)

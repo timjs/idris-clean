@@ -68,10 +68,6 @@ build Lists-cl: clean Lists.icl
 # build PrimitiveArrays.icl: idris-clean PrimitiveArrays.ibc
 # build PrimitiveArrays-cl: clean PrimitiveArrays.icl
 
-build Pythagoras-id | Pythagoras.ibc: idris Pythagoras.idr
-build Pythagoras.icl: idris-clean Pythagoras.ibc
-build Pythagoras-cl: clean Pythagoras.icl
-
 build Records-id | Records.ibc: idris Records.idr
 build Records.icl: idris-clean Records.ibc
 build Records-cl: clean Records.icl
