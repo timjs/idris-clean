@@ -40,7 +40,7 @@ str z k (S n) = if(y == flr 4 z)
                    else      str (comp z                 (fn k)) (k+1) (S n)
   where y = flr 3 z
 
-pidigit : IO()
+pidigit : IO ()
 pidigit = do
   [_,a] <- getArgs
   let n = fromIntegerNat (the Integer (cast a))
