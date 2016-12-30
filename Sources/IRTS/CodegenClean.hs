@@ -64,7 +64,9 @@ cgModule name = "module" <+> string name
 
 cgImports, cgPredefined, cgStart :: Doc
 cgImports = vsep $ map ("import" <+>)
-    [ "StdEnv" ]
+    [ "StdEnv"
+    , "StdPointer"
+    ]
 cgPredefined = vsep
     [ ":: Value = Nothing"
     , indent "| Boxed_Bool !Bool"
@@ -88,11 +90,17 @@ cgPredefined = vsep
     , "clean_String_len (Boxed_String str) :== Boxed_Int (size str)"
     , "clean_String_substring (Boxed_Int ofs) (Boxed_Int len) (Boxed_String str) :== Boxed_String (str % (ofs, ofs + len))"
     , blank
-    , "clean_IO_write_String world (Boxed_String str) | clean_IO_toStdout str :== Nothing"
-    , "clean_IO_read_String world :== Boxed_String clean_IO_fromStdin"
+    , "clean_System_write_String world (Boxed_String str) | clean_Prim_toStdout str :== Nothing"
+    , "clean_System_read_String world"
+    , indent "# (str, ok) = clean_Prim_fromStdin"
+    , indent "| ok :== Boxed_String str"
+    , "clean_System_numArgs world :== Boxed_Int (fst clean_Prim_args)"
+    --cgForeign (FApp C_IntT [FUnknown,FCon C_IntNative]) (FStr "idris_numArgs") [] =
+    , "clean_System_getArgs (Boxed_Int idx) :== Boxed_String ((snd clean_Prim_args) !! idx)"
+    --cgForeign (FCon C_Str) (FStr "idris_getArg") [(FApp C_IntT [FUnknown,FCon C_IntNative], exp)] =
     , blank
-    , "clean_IO_toStdout :: !String -> Bool"
-    , "clean_IO_toStdout str = code inline {"
+    , "clean_Prim_toStdout :: !String -> Bool"
+    , "clean_Prim_toStdout str = code inline {"
     , indent ".d 1 0"
     , indent $ indent "jsr stdioF"
     , indent ".o 1 2 f"
@@ -103,8 +111,8 @@ cgPredefined = vsep
     , indent $ indent "jsr closeF"
     , indent ".o 0 1 b"
     , "}"
-    , "clean_IO_fromStdin :: String"
-    , "clean_IO_fromStdin = code inline {"
+    , "clean_Prim_fromStdin :: (!String,!Bool)"
+    , "clean_Prim_fromStdin = code inline {"
     , indent ".d 0 0"
     , indent $ indent "jsr stdioF"
     , indent ".o 0 2 f"
@@ -114,8 +122,12 @@ cgPredefined = vsep
     , indent ".d 1 2 f"
     , indent $ indent "jsr closeF"
     , indent ".o 1 1 b"
-    , indent "pop_b"
     , "}"
+    , "clean_Prim_args :: (!Int, [String])"
+    , "clean_Prim_args"
+    , indent "# argc = readInt32Z global_argc 0"
+    , indent "# argv = derefInt global_argv"
+    , indent "= (argc, [derefString (readInt argv (i << (IF_INT_64_OR_32 3 2)) ) \\\\ i <- [0..argc - 1]])"
     ]
 cgStart = vsep
     [ "Start =" <+> cgFunName (MN 0 "runMain") ]
@@ -192,12 +204,12 @@ cgExp (DConst const) =
     cgConst const
 cgExp (DOp prim exps) =
     cgPrim prim exps
+cgExp (DForeign fun ret args) =
+    cgForeign fun ret args
 cgExp DNothing =
     "Nothing" --cgUnsupported "NOTHING" ()
 cgExp (DError msg) =
     appPrefix "abort" [dquotes $ string msg]
-cgExp e =
-    cgUnsupported "EXPRESSION" e
 
 cgIfThenElse :: DExp -> DExp -> DExp -> Doc
 cgIfThenElse test thenAlt elseAlt =
@@ -220,6 +232,16 @@ cgAlt (DConstCase const exp) =
     cgConst const <+> "->" <+> cgExp exp
 cgAlt (DDefaultCase exp) =
     char '_' <+> "->" <+> cgExp exp
+
+-- Foreign Calls ---------------------------------------------------------------
+
+cgForeign :: FDesc -> FDesc -> [(FDesc, DExp)]-> Doc
+cgForeign _ (FStr "idris_numArgs") [] =
+    cgApp "clean_System_numArgs" [DNothing]
+cgForeign _ (FStr "idris_getArg") [(_, exp)] =
+    cgApp "clean_System_getArgs" [exp]
+cgForeign fun ret args =
+    cgUnsupported "FOREIGN CALL" (fun, ret, args)
 
 -- Constants and Primitives ----------------------------------------------------
 
@@ -290,8 +312,8 @@ cgPrim LStrIndex  = cgApp "clean_String_index"
 cgPrim LStrLen    = cgApp "clean_String_len"
 cgPrim LStrSubstr = cgApp "clean_String_substr"
 
-cgPrim LWriteStr = cgApp "clean_IO_write_String"
-cgPrim LReadStr = cgApp "clean_IO_read_String"
+cgPrim LWriteStr = cgApp "clean_System_write_String"
+cgPrim LReadStr = cgApp "clean_System_read_String"
 
 --cgPrim (LExternal n) = cgExtern $ show n
 

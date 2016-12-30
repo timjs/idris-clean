@@ -5,4 +5,4 @@ rule idris-clean
 rule idris-php
     command = idris-codegen-php $in -o $out
 rule clean
-    command = clm -b -nt -h 209715200 $$(basename -s .icl $in) -o $out
+    command = clm -b -nt -h 209715200 -I ../Libraries $$(basename -s .icl $in) -o $out
