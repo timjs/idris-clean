@@ -83,12 +83,12 @@ cgPredefined = vsep
     , "unbox_String (Boxed_String x) :== x"
     , blank
     , "clean_String_cons (Boxed_Char chr) (Boxed_String str) :== Boxed_String (toString chr +++ str)"
-    , "clean_String_reverse (Boxed_String str) :== Boxed_String (toString (reverse (fromString str)))"
+    , "clean_String_reverse (Boxed_String str) :== Boxed_String { str.[i] \\\\ i <- reverse [0..size str - 1] }"
     , "clean_String_head (Boxed_String str) :== Boxed_Char (select str 0)"
     , "clean_String_tail (Boxed_String str) :== Boxed_String (str % (1, size str - 1))"
     , "clean_String_index (Boxed_String str) (Boxed_Int i) :== Boxed_Char (select str i)"
     , "clean_String_len (Boxed_String str) :== Boxed_Int (size str)"
-    , "clean_String_substring (Boxed_Int ofs) (Boxed_Int len) (Boxed_String str) :== Boxed_String (str % (ofs, ofs + len))"
+    , "clean_String_substring (Boxed_Int ofs) (Boxed_Int len) (Boxed_String str) :== Boxed_String (str % (ofs, ofs + len - 1))"
     , blank
     , "clean_System_write_String world (Boxed_String str) | clean_Prim_toStdout str :== Nothing"
     , "clean_System_read_String world"
@@ -310,7 +310,7 @@ cgPrim LStrHead   = cgApp "clean_String_head"
 cgPrim LStrTail   = cgApp "clean_String_tail"
 cgPrim LStrIndex  = cgApp "clean_String_index"
 cgPrim LStrLen    = cgApp "clean_String_len"
-cgPrim LStrSubstr = cgApp "clean_String_substr"
+cgPrim LStrSubstr = cgApp "clean_String_substring"
 
 cgPrim LWriteStr = cgApp "clean_System_write_String"
 cgPrim LReadStr = cgApp "clean_System_read_String"
