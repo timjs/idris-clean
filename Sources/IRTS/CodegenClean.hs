@@ -398,14 +398,18 @@ cgLoc :: Int -> Doc
 cgLoc idx = "x" <> int idx
 
 cgFunName, cgConName, cgVarName :: Name -> Doc
-cgFunName name = string . fix $ "idris_" ++ mangle name
-cgConName name = string . fix $ "Idris_" ++ mangle name
-cgVarName name = string . fix $ mangle name
+cgFunName name = string . fixMangle $ "idris_" ++ mangle name
+cgConName name = string . fixMangle $ "Idris_" ++ mangle name
+cgVarName name = string . fixMangle $ mangle name
 
 -- Fixes mkFnCon and mkUnderCon from IRTS.Defunctionalise
-fix :: String -> String
-fix name@(c:cs)
+fixMangle :: String -> String
+fixMangle name@(c:cs)
+    -- Parameters of underapplied functions
     | "P_" `isPrefixOf` name = toLower c : cs
+    -- Calls to partial constructors (?)
+    | "idris_P_" `isPrefixOf` name = toUpper c : cs
+    -- Calls to underapplied functions
     | "idris_U_" `isPrefixOf` name = toUpper c : cs
     | otherwise = name
 
