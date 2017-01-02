@@ -4,7 +4,7 @@ A priliminary backend for [Idris](http://www.idris-lang.org/) that compiles to [
 
 ## Example
 
-```shell
+```
 $ cat pythagoras.idr
 module Main
 
@@ -40,15 +40,15 @@ It's the fastest lazy language out in the wild that I know of :wink:.
 The ABC machine is an abstract machine to close the gap between high level functional languages and low level machine code.
 The four main parts of the machine are a _graph store_, containing _nodes_ (or _closures_) to be rewritten to normal form, and three stacks:
 
-- The __A__ddress or __A__rgument stack: holding references to nodes in the graph store.
-- The __B__asic value stack: holding basic values like `Int`s, `Char`s, `Real`s and `Bool`s.
-- The __C__ontrol stack: holding return addresses for control flow.
+- The **A**ddress or **A**rgument stack: holding references to nodes in the graph store.
+- The **B**asic value stack: holding basic values like `Int`s, `Char`s, `Real`s and `Bool`s.
+- The **C**ontrol stack: holding return addresses for control flow.
 
 The code generator for the ABC machine developed at the [Software Science group](http://www.sws.cs.ru.nl/) of the [Radboud University](http://www.ru.nl/icis) generates fast code for Intel (64-bit and 32-bit) and ARM (32-bit only) on Windows, Linux and macOS.
 
 First tests show that this backend is __3 to 4 times faster__ than Idris' current C backend (on my 2012 MacBook Air).
 This is _without_ any optimisations like unboxed `Bool`s, `Int`s and `Real`s that Clean and ABC use heavily.
-Clean's native version of the [Pythagoras benchmark](Benchmarks/pythagors.idr) runs one order of magnitude faster, so there is a lot to win here!
+Clean's native version of the [Pythagoras benchmark](Benchmarks/pythagoras.idr) runs one order of magnitude faster, so there is a lot to win here!
 
 ## Usage
 
