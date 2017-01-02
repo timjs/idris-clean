@@ -3,14 +3,23 @@ include ../rules.ninja
 build Bits32-id | Bits32.ibc: idris Bits32.idr
 build Bits32.icl: idris-clean Bits32.ibc
 build Bits32-cl: clean Bits32.icl
+build Bits32-id.out: eval Bits32-id
+build Bits32-cl.out: eval Bits32-cl
+build Bits32-test: diff Bits32-id.out Bits32-cl.out
 
 build Chars-id | Chars.ibc: idris Chars.idr
 build Chars.icl: idris-clean Chars.ibc
 build Chars-cl: clean Chars.icl
+build Chars-id.out: eval Chars-id
+build Chars-cl.out: eval Chars-cl
+build Chars-test: diff Chars-id.out Chars-cl.out
 
 build Data-id | Data.ibc: idris Data.idr
 build Data.icl: idris-clean Data.ibc
 build Data-cl: clean Data.icl
+build Data-id.out: eval Data-id
+build Data-cl.out: eval Data-cl
+build Data-test: diff Data-id.out Data-cl.out
 
 # build Delegates-id | Delegates.ibc: idris Delegates.idr
 # build Delegates.icl: idris-clean Delegates.ibc
@@ -19,6 +28,9 @@ build Data-cl: clean Data.icl
 build Doubles-id | Doubles.ibc: idris Doubles.idr
 build Doubles.icl: idris-clean Doubles.ibc
 build Doubles-cl: clean Doubles.icl
+build Doubles-id.out: eval Doubles-id
+build Doubles-cl.out: eval Doubles-cl
+build Doubles-test: diff Doubles-id.out Doubles-cl.out
 
 # build EffectsTest-id | EffectsTest.ibc: idris EffectsTest.idr
 # build EffectsTest.icl: idris-clean EffectsTest.ibc
@@ -35,6 +47,9 @@ build Doubles-cl: clean Doubles.icl
 build Foldables-id | Foldables.ibc: idris Foldables.idr
 build Foldables.icl: idris-clean Foldables.ibc
 build Foldables-cl: clean Foldables.icl
+build Foldables-id.out: eval Foldables-id
+build Foldables-cl.out: eval Foldables-cl
+build Foldables-test: diff Foldables-id.out Foldables-cl.out
 
 # build Generics-id | Generics.ibc: idris Generics.idr
 # build Generics.icl: idris-clean Generics.ibc
@@ -47,18 +62,30 @@ build Foldables-cl: clean Foldables.icl
 build HelloWorld-id | HelloWorld.ibc: idris HelloWorld.idr
 build HelloWorld.icl: idris-clean HelloWorld.ibc
 build HelloWorld-cl: clean HelloWorld.icl
+build HelloWorld-id.out: eval HelloWorld-id
+build HelloWorld-cl.out: eval HelloWorld-cl
+build HelloWorld-test: diff HelloWorld-id.out HelloWorld-cl.out
 
 build IfThenElse-id | IfThenElse.ibc: idris IfThenElse.idr
 build IfThenElse.icl: idris-clean IfThenElse.ibc
 build IfThenElse-cl: clean IfThenElse.icl
+build IfThenElse-id.out: eval IfThenElse-id
+build IfThenElse-cl.out: eval IfThenElse-cl
+build IfThenElse-test: diff IfThenElse-id.out IfThenElse-cl.out
 
 build Ints-id | Ints.ibc: idris Ints.idr
 build Ints.icl: idris-clean Ints.ibc
 build Ints-cl: clean Ints.icl
+build Ints-id.out: eval Ints-id
+build Ints-cl.out: eval Ints-cl
+build Ints-test: diff Ints-id.out Ints-cl.out
 
 build Lists-id | Lists.ibc: idris Lists.idr
 build Lists.icl: idris-clean Lists.ibc
 build Lists-cl: clean Lists.icl
+build Lists-id.out: eval Lists-id
+build Lists-cl.out: eval Lists-cl
+build Lists-test: diff Lists-id.out Lists-cl.out
 
 # build Nullable-id | Nullable.ibc: idris Nullable.idr
 # build Nullable.icl: idris-clean Nullable.ibc
@@ -71,6 +98,9 @@ build Lists-cl: clean Lists.icl
 build Records-id | Records.ibc: idris Records.idr
 build Records.icl: idris-clean Records.ibc
 build Records-cl: clean Records.icl
+build Records-id.out: eval Records-id
+build Records-cl.out: eval Records-cl
+build Records-test: diff Records-id.out Records-cl.out
 
 # build ReferenceTypeArrays-id | ReferenceTypeArrays.ibc: idris ReferenceTypeArrays.idr
 # build ReferenceTypeArrays.icl: idris-clean ReferenceTypeArrays.ibc
@@ -79,6 +109,9 @@ build Records-cl: clean Records.icl
 build Show-id | Show.ibc: idris Show.idr
 build Show.icl: idris-clean Show.ibc
 build Show-cl: clean Show.icl
+build Show-id.out: eval Show-id
+build Show-cl.out: eval Show-cl
+build Show-test: diff Show-id.out Show-cl.out
 
 # build SinglePrimitives-id | SinglePrimitives.ibc: idris SinglePrimitives.idr
 # build SinglePrimitives.icl: idris-clean SinglePrimitives.ibc
@@ -87,18 +120,30 @@ build Show-cl: clean Show.icl
 build SortedSet-id | SortedSet.ibc: idris SortedSet.idr
 build SortedSet.icl: idris-clean SortedSet.ibc
 build SortedSet-cl: clean SortedSet.icl
+build SortedSet-id.out: eval SortedSet-id
+build SortedSet-cl.out: eval SortedSet-cl
+build SortedSet-test: diff SortedSet-id.out SortedSet-cl.out
 
 build Streams-id | Streams.ibc: idris Streams.idr
 build Streams.icl: idris-clean Streams.ibc
 build Streams-cl: clean Streams.icl
+build Streams-id.out: eval Streams-id
+build Streams-cl.out: eval Streams-cl
+build Streams-test: diff Streams-id.out Streams-cl.out
 
 build Strings-id | Strings.ibc: idris Strings.idr
 build Strings.icl: idris-clean Strings.ibc
 build Strings-cl: clean Strings.icl
+build Strings-id.out: eval Strings-id
+build Strings-cl.out: eval Strings-cl
+build Strings-test: diff Strings-id.out Strings-cl.out
 
 build StrInt-id | StrInt.ibc: idris StrInt.idr
 build StrInt.icl: idris-clean StrInt.ibc
 build StrInt-cl: clean StrInt.icl
+build StrInt-id.out: eval StrInt-id
+build StrInt-cl.out: eval StrInt-cl
+build StrInt-test: diff StrInt-id.out StrInt-cl.out
 
 # build ValueTypeArrays-id | ValueTypeArrays.ibc: idris ValueTypeArrays.idr
 # build ValueTypeArrays.icl: idris-clean ValueTypeArrays.ibc
