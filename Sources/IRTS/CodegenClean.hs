@@ -34,6 +34,7 @@ blank = space
 deline, dequote :: String -> String
 deline = map (\c -> if c == '\n' then ' ' else c)
 dequote = map (\c -> if c == '"' then '\'' else c)
+fixExponent = map (\c -> if c == 'e' then 'E' else c)
 
 appPrefix, appInfix :: Doc -> [Doc] -> Doc
 appPrefix fun args = parens $
@@ -223,7 +224,8 @@ cgCase :: DExp -> [DAlt] -> Doc
 cgCase exp alts =
     -- parens for `case` in `case`
     parens $ "case" <+> cgExp exp <+> "of" <$>
-    indent (vsep (map cgAlt alts))
+    -- double indent for `case` in `let`
+    indent (indent (vsep (map cgAlt alts)))
 
 cgAlt :: DAlt -> Doc
 cgAlt (DConCase _tag name args exp) =
@@ -253,9 +255,9 @@ cgConst (B8 i)  = cgBox BInt . string . show $ i
 cgConst (B16 i) = cgBox BInt . string . show $ i
 cgConst (B32 i) = cgBox BInt . string . show $ i
 cgConst (B64 i) = cgBox BInt . string . show $ i
-cgConst (Fl d)  = cgBox BReal $ double d
-cgConst (Ch c)  = cgBox BChar $ squotes . string . cgEscape False $ c
-cgConst (Str s) = cgBox BString $ dquotes . string . concatMap (cgEscape True) $ s
+cgConst (Fl d)  = cgBox BReal . string . fixExponent . show $ d
+cgConst (Ch c)  = cgBox BChar . squotes . string . cgEscape False $ c
+cgConst (Str s) = cgBox BString . dquotes . string . concatMap (cgEscape True) $ s
 cgConst c       = cgUnsupported "CONSTANT" c
 
 cgEscape :: Bool -> Char -> String
