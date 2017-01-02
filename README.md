@@ -102,3 +102,14 @@ $ ninja
 ```
 
 ## Enjoy!
+
+This is experimental software and contains BUGS!
+Not all features of Idris are already implemented.
+Some known bugs/limitations:
+
+- `BigInt`s are implemented as native ABC `Int`s and are **not checked on overflow**.
+- Updates are not implemented
+- No FFI
+- No unboxing
+
+
