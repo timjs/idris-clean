@@ -249,7 +249,7 @@ cgForeign fun ret args =
 
 cgConst :: Const -> Doc
 cgConst (I i)   = cgBox BInt $ int i
-cgConst (BI i)  = cgBox BInt $ if validInt i then integer i else cgUnsupported "INTEGER VALUE IS TO BIG" i
+cgConst (BI i)  = cgBox BInt $ if validInt i then integer i else cgUnsupported "BIG INTEGER VALUE" i
 -- Translate all bit types to `BInt`, Clean doesn't have different integer sizes.
 cgConst (B8 i)  = cgBox BInt . string . show $ i
 cgConst (B16 i) = cgBox BInt . string . show $ i
@@ -341,7 +341,7 @@ cgPrim LFFloor  = cgReboxFn BReal BInt "entier"
 --cgPrim LFCeil   = cgReboxFn BReal BInt "ceil"
 cgPrim LFNegate = cgPrimFn BReal "~" -- \[x] -> text "~" <> x
 
-cgPrim f = \_args -> cgUnsupported "PRIMITIVE" f
+cgPrim f = \args -> cgUnsupported "PRIMITIVE" (f, args)
 
 cgPrimFn, cgPrimOp :: BoxedTy -> Doc -> [DExp] -> Doc
 cgPrimFn ty = cgReboxFn ty ty
