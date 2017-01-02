@@ -127,9 +127,9 @@ build SortedSet-test: diff SortedSet-id.out SortedSet-cl.out
 build Streams-id | Streams.ibc: idris Streams.idr
 build Streams.icl: idris-clean Streams.ibc
 build Streams-cl: clean Streams.icl
-build Streams-id.out: eval Streams-id
-build Streams-cl.out: eval Streams-cl
-build Streams-test: diff Streams-id.out Streams-cl.out
+# build Streams-id.out: eval Streams-id
+# build Streams-cl.out: eval Streams-cl
+# build Streams-test: diff Streams-id.out Streams-cl.out
 
 build Strings-id | Strings.ibc: idris Strings.idr
 build Strings.icl: idris-clean Strings.ibc

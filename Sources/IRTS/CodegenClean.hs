@@ -247,7 +247,7 @@ cgForeign fun ret args =
 
 cgConst :: Const -> Doc
 cgConst (I i)   = cgBox BInt $ int i
-cgConst (BI i)  = cgBox BInt $ integer i --FIXME to big...
+cgConst (BI i)  = cgBox BInt $ if validInt i then integer i else cgUnsupported "INTEGER VALUE IS TO BIG" i
 -- Translate all bit types to `BInt`, Clean doesn't have different integer sizes.
 cgConst (B8 i)  = cgBox BInt . string . show $ i
 cgConst (B16 i) = cgBox BInt . string . show $ i
@@ -424,6 +424,12 @@ mangle name = concatMap mangleChar (showCG name)
         isIdent c = isAlpha c || isDigit c || c == '_'
         isSep c = c == '.'
         isBrace c = c == '{' || c == '}'
+
+validInt :: Integer -> Bool
+validInt i = i > minInt && i < maxInt
+    where
+        minInt = -(2^63)
+        maxInt = 2^63 - 1
 
 falseName, trueName :: Name
 falseName = NS (UN "False") ["Bool", "Prelude"]
