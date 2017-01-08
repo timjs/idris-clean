@@ -1,0 +1,13 @@
+include ../../rules.ninja
+
+build pythagorasBoxedLazy-cl: clean-start pythagorasBoxedLazy.icl
+build pythagorasBoxedLazy-cl.out: eval pythagorasBoxedLazy-cl
+
+build pythagorasBoxedStrict-cl: clean-start pythagorasBoxedStrict.icl
+build pythagorasBoxedStrict-cl.out: eval pythagorasBoxedStrict-cl
+
+build pythagorasUnboxedLazy-cl: clean-start pythagorasUnboxedLazy.icl
+build pythagorasUnboxedLazy-cl.out: eval pythagorasUnboxedLazy-cl
+
+build pythagorasUnboxedStrict-cl: clean-start pythagorasUnboxedStrict.icl
+build pythagorasUnboxedStrict-cl.out: eval pythagorasUnboxedStrict-cl
