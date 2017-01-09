@@ -174,7 +174,8 @@ cgExp (DLet name def rest) =
 cgExp (DUpdate var def) =
     cgUnsupported "UPDATE" (var, def)
 cgExp (DProj def idx) =
-    cgExp def <+> brackets (int idx)
+    cgUnsupported "PROJECT" (def, idx)
+    --cgExp def <+> brackets (int idx)
 -- Constructors: False, True
 -- cgExp (DC _ 0 name []) | name == falseName =
 --     cgBox BBool "False"
