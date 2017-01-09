@@ -7,7 +7,6 @@ import Prelude hiding ((<$>))
 
 import IRTS.CodegenCommon
 import IRTS.Lang
-import IRTS.Defunctionalise
 import Idris.Core.TT
 
 import Numeric (showHex)
@@ -46,7 +45,7 @@ appInfix op [left, right] = parens $
 
 codegenClean :: CodeGenerator
 codegenClean info = do
-    let (funcs, ctors) = partition isFun (defunDecls info)
+    let (funcs, ctors) = partition isFun (liftDecls info)
     let output = vsep $ intersperse blank
             [ cgModule (takeBaseName $ outputFile info)
             , cgImports
@@ -57,8 +56,8 @@ codegenClean info = do
             ]
     withFile (outputFile info) WriteMode (`hPutDoc` output)
     where
-        isFun (_, DFun{}) = True
-        isFun (_, DConstructor{}) = False
+        isFun (_, LFun{}) = True
+        isFun (_, LConstructor{}) = False
 
 cgModule :: String -> Doc
 cgModule name = "module" <+> string name
@@ -135,84 +134,87 @@ cgStart = vsep
 
 -- Declarations and Expressions ------------------------------------------------
 
-cgConstructors :: [(Name, DDecl)] -> Doc
+cgConstructors :: [(Name, LDecl)] -> Doc
 cgConstructors decls =
     ":: Value" <$>
     indent (vsep $ map (cgCon . snd) decls)
 
-cgCon :: DDecl -> Doc
-cgCon (DConstructor name tag arity) =
+cgCon :: LDecl -> Doc
+cgCon (LConstructor name tag arity) =
     --FIXME strictness
     "///" <+> string (show name) <+> parens (int tag) <$>
     char '|' <+> cgConName name <+> hsep (replicate arity "!Value")
 
-cgFunctions :: [(Name, DDecl)] -> Doc
+cgFunctions :: [(Name, LDecl)] -> Doc
 cgFunctions = vsep . map (cgFun . snd)
 
-cgFun :: DDecl -> Doc
-cgFun (DFun name args def) =
+cgFun :: LDecl -> Doc
+cgFun (LFun _opt name args def) =
     let arity = length args in
     blank <$>
     "///" <+> (string . show) name <$>
     "///" <+> (string . deline . show) def <$>
-    cgFunName name <+> "::" <+> (if arity > 0
-        then hsep (replicate arity "!Value") <+> "->"
-        else empty) <+> "Value" <$>
+    -- cgFunName name <+> "::" <+> (if arity > 0
+        -- then hsep (replicate arity "!Value") <+> "->"
+        -- else empty) <+> "Value" <$>
     cgFunName name <+> hsep (map cgVarName args) <+> char '=' <$>
     indent (cgExp def)
 
-cgExp :: DExp -> Doc
-cgExp (DV var) =
+cgExp :: LExp -> Doc
+cgExp (LV var) =
     cgVar var
-cgExp (DApp _istail name args) =
-    cgApp (cgFunName name) args
-cgExp (DLet name def rest) =
+cgExp (LApp _istail (LV (Glob fun)) args) =
+    cgFn (cgFunName fun) args
+cgExp (LApp _istail exp args) =
+    cgApp exp args
+cgExp (LLet name def rest) =
     --FIXME should be strict always?
     "let" <+> cgVarName name <+> char '=' <+> cgExp def <+> "in" <$>
     indent (cgExp rest) <$>
     blank
-cgExp (DUpdate var def) =
-    cgUnsupported "UPDATE" (var, def)
-cgExp (DProj def idx) =
+cgExp (LProj def idx) =
     cgExp def <+> brackets (int idx)
 -- Constructors: False, True
--- cgExp (DC _ 0 name []) | name == falseName =
+-- cgExp (LCon _ 0 name []) | name == falseName =
 --     cgBox BBool "False"
--- cgExp (DC _ 1 name []) | name == trueName =
+-- cgExp (LCon _ 1 name []) | name == trueName =
 --     cgBox BBool "True"
 -- Constructors: rest
-cgExp (DC _reloc _tag name args) =
+cgExp (LCon _reloc _tag name args) =
     --FIXME optimize to Int for argless ctors
-    cgApp (cgConName name) args
+    cgFn (cgConName name) args
 -- Case: if-then-else
--- cgExp (DCase _ test [DConCase 0 false [] elseAlt, DConCase 1 true  [] thenAlt]) | false == falseName && true == trueName =
+-- cgExp (LCase _ test [LConCase 0 false [] elseAlt, LConCase 1 true  [] thenAlt]) | false == falseName && true == trueName =
 --     cgIfThenElse test thenAlt elseAlt
--- cgExp (DCase _ test [DConCase 1 true  [] thenAlt, DConCase 0 false [] elseAlt]) | false == falseName && true == trueName =
+-- cgExp (LCase _ test [LConCase 1 true  [] thenAlt, LConCase 0 false [] elseAlt]) | false == falseName && true == trueName =
 --     cgIfThenElse test thenAlt elseAlt
--- cgExp (DCase _ test [DConCase 0 false [] elseAlt, DDefaultCase thenAlt ]) | false == falseName =
+-- cgExp (LCase _ test [LConCase 0 false [] elseAlt, LDefaultCase thenAlt ]) | false == falseName =
 --     cgIfThenElse test thenAlt elseAlt
--- cgExp (DCase _ test [DConCase 1 true  [] thenAlt, DDefaultCase elseAlt ]) | true == trueName =
+-- cgExp (LCase _ test [LConCase 1 true  [] thenAlt, LDefaultCase elseAlt ]) | true == trueName =
 --     cgIfThenElse test thenAlt elseAlt
-cgExp (DCase _ test [DConstCase (I 0) elseAlt, DDefaultCase thenAlt]) =
+cgExp (LCase _ test [LConstCase (I 0) elseAlt, LDefaultCase thenAlt]) =
     cgIfThenElse test thenAlt elseAlt
---cgExp (DCase _ test [t@SConstCase{}, e@SDefaultCase{}, SDefaultCase{}]) = emit (SCase Shared v [t, e])
+--cgExp (LCase _ test [t@SConstCase{}, e@SDefaultCase{}, SDefaultCase{}]) = emit (SCase Shared v [t, e])
 -- Case: rest
-cgExp (DCase _casetype exp alts) =
+cgExp (LCase _casetype exp alts) =
     cgCase exp alts
-cgExp (DChkCase exp alts) =
-    cgCase exp alts
-cgExp (DConst const) =
+cgExp (LConst const) =
     cgConst const
-cgExp (DOp prim exps) =
+cgExp (LOp prim exps) =
     cgPrim prim exps
-cgExp (DForeign fun ret args) =
+cgExp (LForeign fun ret args) =
     cgForeign fun ret args
-cgExp DNothing =
+cgExp LNothing =
     "Nothing" --cgUnsupported "NOTHING" ()
-cgExp (DError msg) =
+cgExp (LError msg) =
     appPrefix "abort" [dquotes $ string msg]
+cgExp exp =
+    cgUnsupported "EXPRESSION" exp
 
-cgIfThenElse :: DExp -> DExp -> DExp -> Doc
+cgApp :: LExp -> [LExp] -> Doc
+cgApp exp args = appPrefix (parens (cgExp exp)) (map cgExp args)
+
+cgIfThenElse :: LExp -> LExp -> LExp -> Doc
 cgIfThenElse test thenAlt elseAlt =
     "if" <+> cgUnbox BBool (cgExp test) <$>
     indent (
@@ -220,28 +222,28 @@ cgIfThenElse test thenAlt elseAlt =
         parens (cgExp elseAlt)
     )
 
-cgCase :: DExp -> [DAlt] -> Doc
+cgCase :: LExp -> [LAlt] -> Doc
 cgCase exp alts =
     -- parens for `case` in `case`
     parens $ "case" <+> cgExp exp <+> "of" <$>
     -- double indent for `case` in `let`
     indent (indent (vsep (map cgAlt alts)))
 
-cgAlt :: DAlt -> Doc
-cgAlt (DConCase _tag name args exp) =
+cgAlt :: LAlt -> Doc
+cgAlt (LConCase _tag name args exp) =
     cgConName name <+> hsep (map cgVarName args) <+> "->" <+> cgExp exp
-cgAlt (DConstCase const exp) =
+cgAlt (LConstCase const exp) =
     cgConst const <+> "->" <+> cgExp exp
-cgAlt (DDefaultCase exp) =
+cgAlt (LDefaultCase exp) =
     char '_' <+> "->" <+> cgExp exp
 
 -- Foreign Calls ---------------------------------------------------------------
 
-cgForeign :: FDesc -> FDesc -> [(FDesc, DExp)]-> Doc
+cgForeign :: FDesc -> FDesc -> [(FDesc, LExp)]-> Doc
 cgForeign _ (FStr "idris_numArgs") [] =
-    cgApp "clean_System_numArgs" [DNothing]
+    cgFn "clean_System_numArgs" [LNothing]
 cgForeign _ (FStr "idris_getArg") [(_, exp)] =
-    cgApp "clean_System_getArgs" [exp]
+    cgFn "clean_System_getArgs" [exp]
 cgForeign fun ret args =
     cgUnsupported "FOREIGN CALL" (fun, ret, args)
 
@@ -269,7 +271,7 @@ cgEscape isString c
     | c <= '\xFF' = "\\x" ++ showHex (ord c) ""
     | otherwise = error $ "idris-codegen-clean: char " ++ show c ++ " is bigger than 255"
 
-cgPrim :: PrimFn -> [DExp] -> Doc
+cgPrim :: PrimFn -> [LExp] -> Doc
 cgPrim (LPlus  ty) = cgPrimOp (cgATy ty) "+"
 cgPrim (LMinus ty) = cgPrimOp (cgATy ty) "-"
 cgPrim (LTimes ty) = cgPrimOp (cgATy ty) "*"
@@ -297,25 +299,25 @@ cgPrim (LGe    ty) = cgReboxOp (cgITy ty) BBool ">="
 cgPrim (LSGe   ty) = cgReboxOp (cgATy ty) BBool ">="
 
 --XXX Only Char to Int and Int to Char? Rest is 64bit on 64bit machines...
-cgPrim (LSExt _ _)    = cgApp "id"
-cgPrim (LZExt _ _)    = cgApp "id"
-cgPrim (LBitCast _ _) = cgApp "id"
-cgPrim (LTrunc _ _)   = cgApp "id"
+cgPrim (LSExt _ _)    = cgFn "id"
+cgPrim (LZExt _ _)    = cgFn "id"
+cgPrim (LBitCast _ _) = cgFn "id"
+cgPrim (LTrunc _ _)   = cgFn "id"
 
 cgPrim LStrConcat = cgPrimOp BString "+++"
 cgPrim LStrLt     = cgReboxOp BString BBool "<"
 cgPrim LStrEq     = cgReboxOp BString BBool "=="
 
-cgPrim LStrRev    = cgApp "clean_String_reverse"
-cgPrim LStrCons   = cgApp "clean_String_cons"
-cgPrim LStrHead   = cgApp "clean_String_head"
-cgPrim LStrTail   = cgApp "clean_String_tail"
-cgPrim LStrIndex  = cgApp "clean_String_index"
-cgPrim LStrLen    = cgApp "clean_String_len"
-cgPrim LStrSubstr = cgApp "clean_String_substring"
+cgPrim LStrRev    = cgFn "clean_String_reverse"
+cgPrim LStrCons   = cgFn "clean_String_cons"
+cgPrim LStrHead   = cgFn "clean_String_head"
+cgPrim LStrTail   = cgFn "clean_String_tail"
+cgPrim LStrIndex  = cgFn "clean_String_index"
+cgPrim LStrLen    = cgFn "clean_String_len"
+cgPrim LStrSubstr = cgFn "clean_String_substring"
 
-cgPrim LWriteStr = cgApp "clean_System_write_String"
-cgPrim LReadStr = cgApp "clean_System_read_String"
+cgPrim LWriteStr = cgFn "clean_System_write_String"
+cgPrim LReadStr = cgFn "clean_System_read_String"
 
 --cgPrim (LExternal n) = cgExtern $ show n
 
@@ -343,10 +345,10 @@ cgPrim LFNegate = cgPrimFn BReal "~" -- \[x] -> text "~" <> x
 
 cgPrim f = \args -> cgUnsupported "PRIMITIVE" (f, args)
 
-cgPrimFn, cgPrimOp :: BoxedTy -> Doc -> [DExp] -> Doc
+cgPrimFn, cgPrimOp :: BoxedTy -> Doc -> [LExp] -> Doc
 cgPrimFn ty = cgReboxFn ty ty
 cgPrimOp ty = cgReboxOp ty ty
-cgReboxFn, cgReboxOp :: BoxedTy -> BoxedTy -> Doc -> [DExp] -> Doc
+cgReboxFn, cgReboxOp :: BoxedTy -> BoxedTy -> Doc -> [LExp] -> Doc
 cgReboxFn = cgRebox appPrefix
 cgReboxOp = cgRebox appInfix
 
@@ -386,11 +388,11 @@ cgBox, cgUnbox :: BoxedTy -> Doc -> Doc
 cgBox ty exp = appPrefix ("Boxed_" <> pretty ty) [exp]
 cgUnbox ty exp = appPrefix ("unbox_" <> pretty ty) [exp]
 
-cgRebox :: (Doc -> [Doc] -> Doc) -> BoxedTy -> BoxedTy -> Doc -> [DExp] -> Doc
+cgRebox :: (Doc -> [Doc] -> Doc) -> BoxedTy -> BoxedTy -> Doc -> [LExp] -> Doc
 cgRebox app from to fun = cgBox to . app fun . map (cgUnbox from . cgExp)
 
-cgApp :: Doc -> [DExp] -> Doc
-cgApp fun args = appPrefix fun (map cgExp args)
+cgFn :: Doc -> [LExp] -> Doc
+cgFn fun args = appPrefix fun (map cgExp args)
 
 cgVar :: LVar -> Doc
 cgVar (Loc idx) = cgLoc idx --FIXME not in ir?
@@ -400,20 +402,17 @@ cgLoc :: Int -> Doc
 cgLoc idx = "x" <> int idx
 
 cgFunName, cgConName, cgVarName :: Name -> Doc
-cgFunName name = string . fixMangle $ "idris_" ++ mangle name
-cgConName name = string . fixMangle $ "Idris_" ++ mangle name
-cgVarName name = string . fixMangle $ mangle name
+cgFunName name = string $ "idris_" ++ mangle name
+cgConName name = string $ "Idris_" ++ mangle name
+cgVarName = cgFunName
 
--- Fixes mkFnCon and mkUnderCon from IRTS.Defunctionalise
-fixMangle :: String -> String
-fixMangle name@(c:cs)
-    -- Parameters of underapplied functions
-    | "P_" `isPrefixOf` name = toLower c : cs
-    -- Calls to partial constructors (?)
-    | "idris_P_" `isPrefixOf` name = toUpper c : cs
-    -- Calls to underapplied functions
-    | "idris_U_" `isPrefixOf` name = toUpper c : cs
-    | otherwise = name
+-- Let's not mangle _that_ much. Especially function parameters
+-- like `e0` and `e1` are nicer when readable.
+-- cgName :: Name -> Doc
+-- cgName (MN i n) | all (\x -> isAlpha x || x == '_') (T.unpack n)
+--     = text $ T.unpack n ++ show i
+-- cgName n = text (mangle n)  -- <?> show n  -- uncomment this to get a comment for *every* mangled name
+--         isIdent c = isAlpha c || isDigit c || c == '_'
 
 mangle :: Name -> String
 mangle name = concatMap mangleChar (showCG name)
@@ -442,3 +441,74 @@ trueName  = NS (UN "True")  ["Bool", "Prelude"]
 cgUnsupported :: Show a => Text -> a -> Doc
 cgUnsupported msg val =
     appPrefix "abort" [dquotes $ text msg <+> (string . dequote . show) val <+> "IS UNSUPPORTED"]
+
+{-
+data SExp = SV LVar
+data LExp = LV LVar
+data LExp = LV LVar
+
+          | SApp Bool Name [LVar]
+          | LApp Bool Name [LExp] -- True = tail call
+          | LApp Bool LExp [LExp] -- True = tail call
+
+          | SLet LVar SExp SExp
+          | LLet Name LExp LExp -- name just for pretty printing
+          | LLet Name LExp LExp -- name just for pretty printing
+
+          | SUpdate LVar SExp
+          | DUpdate Name LExp -- eval expression, then update var with it
+
+          | SProj LVar Int
+          | LProj LExp Int
+          | LProj LExp Int -- projection
+
+          | SCon (Maybe LVar) Int Name [LVar]
+          | LCon (Maybe LVar) Int Name [LExp]
+          | LCon (Maybe LVar) Int Name [LExp] -- Location to reallocate, if available
+
+          | SCase CaseType LVar [SAlt]
+          | LCase CaseType LExp [LAlt]
+          | LCase CaseType LExp [LAlt]
+
+          | SChkCase LVar [SAlt]
+          | DChkCase LExp [LAlt] -- a case where the type is unknown (for EVAL/APPLY)
+
+          | SConst Const
+          | LConst Const
+          | LConst Const
+
+          | SForeign FDesc FDesc [(FDesc, LVar)]
+          | LForeign FDesc FDesc [(FDesc, LExp)]
+          | LForeign FDesc           -- Function descriptor (usually name as string)
+                     FDesc           -- Return type descriptor
+                     [(FDesc, LExp)] -- first LExp is the FFI type description
+
+          | SOp PrimFn [LVar]
+          | LOp PrimFn [LExp]
+          | LOp PrimFn [LExp]
+
+          | SNothing -- erased value, will never be inspected
+          | LNothing -- erased value, can be compiled to anything since it'll never be inspected
+          | LNothing
+
+          | SError String
+          | LError String
+          | LError String
+
+          -- EXTRA
+          | LLazyApp Name [LExp]     -- True = tail call
+          | LForce LExp              -- make sure Exp is evaluted
+
+          -- LIFTED
+          | LLazyExp LExp            -- lifted out before compiling
+          | LLam [Name] LExp         -- lambda, lifted out before compiling
+
+  deriving Show
+
+
+data DDecl = DFun        Name [Name] DExp --          name, arg names, def
+data LDecl = LFun [LOpt] Name [Name] LExp -- options, name, arg names, def
+
+           | LConstructor Name Int Int -- constructor name, tag, arity
+           | DConstructor Name Int Int -- constructor name, tag, arity
+-}
