@@ -165,7 +165,7 @@ cgExp :: DExp -> Doc
 cgExp (DV var) =
     cgVar var
 cgExp (DApp _istail name args) =
-    cgApp (cgFunName name) args
+    cgFn (cgFunName name) args
 cgExp (DLet name def rest) =
     --FIXME should be strict always?
     "let" <+> cgVarName name <+> char '=' <+> cgExp def <+> "in" <$>
@@ -184,7 +184,7 @@ cgExp (DProj def idx) =
 -- Constructors: rest
 cgExp (DC _reloc _tag name args) =
     --FIXME optimize to Int for argless ctors
-    cgApp (cgConName name) args
+    cgFn (cgConName name) args
 -- Case: if-then-else
 -- cgExp (DCase _ test [DConCase 0 false [] elseAlt, DConCase 1 true  [] thenAlt]) | false == falseName && true == trueName =
 --     cgIfThenElse test thenAlt elseAlt
@@ -240,9 +240,9 @@ cgAlt (DDefaultCase exp) =
 
 cgForeign :: FDesc -> FDesc -> [(FDesc, DExp)]-> Doc
 cgForeign _ (FStr "idris_numArgs") [] =
-    cgApp "clean_System_numArgs" [DNothing]
+    cgFn "clean_System_numArgs" [DNothing]
 cgForeign _ (FStr "idris_getArg") [(_, exp)] =
-    cgApp "clean_System_getArgs" [exp]
+    cgFn "clean_System_getArgs" [exp]
 cgForeign fun ret args =
     cgUnsupported "FOREIGN CALL" (fun, ret, args)
 
@@ -298,25 +298,25 @@ cgPrim (LGe    ty) = cgReboxOp (cgITy ty) BBool ">="
 cgPrim (LSGe   ty) = cgReboxOp (cgATy ty) BBool ">="
 
 --XXX Only Char to Int and Int to Char? Rest is 64bit on 64bit machines...
-cgPrim (LSExt _ _)    = cgApp "id"
-cgPrim (LZExt _ _)    = cgApp "id"
-cgPrim (LBitCast _ _) = cgApp "id"
-cgPrim (LTrunc _ _)   = cgApp "id"
+cgPrim (LSExt _ _)    = cgFn "id"
+cgPrim (LZExt _ _)    = cgFn "id"
+cgPrim (LBitCast _ _) = cgFn "id"
+cgPrim (LTrunc _ _)   = cgFn "id"
 
 cgPrim LStrConcat = cgPrimOp BString "+++"
 cgPrim LStrLt     = cgReboxOp BString BBool "<"
 cgPrim LStrEq     = cgReboxOp BString BBool "=="
 
-cgPrim LStrRev    = cgApp "clean_String_reverse"
-cgPrim LStrCons   = cgApp "clean_String_cons"
-cgPrim LStrHead   = cgApp "clean_String_head"
-cgPrim LStrTail   = cgApp "clean_String_tail"
-cgPrim LStrIndex  = cgApp "clean_String_index"
-cgPrim LStrLen    = cgApp "clean_String_len"
-cgPrim LStrSubstr = cgApp "clean_String_substring"
+cgPrim LStrRev    = cgFn "clean_String_reverse"
+cgPrim LStrCons   = cgFn "clean_String_cons"
+cgPrim LStrHead   = cgFn "clean_String_head"
+cgPrim LStrTail   = cgFn "clean_String_tail"
+cgPrim LStrIndex  = cgFn "clean_String_index"
+cgPrim LStrLen    = cgFn "clean_String_len"
+cgPrim LStrSubstr = cgFn "clean_String_substring"
 
-cgPrim LWriteStr = cgApp "clean_System_write_String"
-cgPrim LReadStr = cgApp "clean_System_read_String"
+cgPrim LWriteStr = cgFn "clean_System_write_String"
+cgPrim LReadStr  = cgFn "clean_System_read_String"
 
 --cgPrim (LExternal n) = cgExtern $ show n
 
@@ -390,8 +390,8 @@ cgUnbox ty exp = appPrefix ("unbox_" <> pretty ty) [exp]
 cgRebox :: (Doc -> [Doc] -> Doc) -> BoxedTy -> BoxedTy -> Doc -> [DExp] -> Doc
 cgRebox app from to fun = cgBox to . app fun . map (cgUnbox from . cgExp)
 
-cgApp :: Doc -> [DExp] -> Doc
-cgApp fun args = appPrefix fun (map cgExp args)
+cgFn :: Doc -> [DExp] -> Doc
+cgFn fun args = appPrefix fun (map cgExp args)
 
 cgVar :: LVar -> Doc
 cgVar (Loc idx) = cgLoc idx --FIXME not in ir?
