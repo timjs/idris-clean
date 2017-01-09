@@ -167,12 +167,10 @@ cgExp (DV var) =
 cgExp (DApp _istail name args) =
     cgFn (cgFunName name) args
 cgExp (DLet name def rest) =
-    --FIXME should be strict always?
-    "let" <+> cgVarName name <+> char '=' <+> cgExp def <+> "in" <$>
-    indent (cgExp rest) <$>
-    blank
+    cgLet name def rest
 cgExp (DUpdate var def) =
-    cgUnsupported "UPDATE" (var, def)
+    --cgLet var def Nothing
+    cgExp def
 cgExp (DProj def idx) =
     cgUnsupported "PROJECT" (def, idx)
     --cgExp def <+> brackets (int idx)
@@ -212,6 +210,15 @@ cgExp DNothing =
     "Nothing" --cgUnsupported "NOTHING" ()
 cgExp (DError msg) =
     appPrefix "abort" [dquotes $ string msg]
+
+cgLet :: Name -> DExp -> DExp -> Doc
+cgLet name def rest =
+    --FIXME should be strict always?
+    "let" <+> cgVarName name <+> char '=' <+> cgExp def <$>
+    "in " <+> align (
+        cgExp rest <$>
+        blank
+    )
 
 cgIfThenElse :: DExp -> DExp -> DExp -> Doc
 cgIfThenElse test thenAlt elseAlt =
