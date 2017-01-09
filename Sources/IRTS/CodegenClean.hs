@@ -17,13 +17,10 @@ import Data.Text.Lazy (Text, pack, unpack)
 import System.IO
 import System.FilePath
 
-import Text.PrettyPrint.Leijen.Text hiding (indent, string)
+import Text.PrettyPrint.Leijen.Text hiding (string)
 import qualified Text.PrettyPrint.Leijen.Text as Pretty
 
 -- Helpers ---------------------------------------------------------------------
-
-indent :: Doc -> Doc
-indent = Pretty.indent 4
 
 string :: String -> Doc
 string = text . pack
@@ -70,12 +67,12 @@ cgImports = vsep $ map ("import" <+>)
     ]
 cgPredefined = vsep
     [ ":: Value = Nothing"
-    , indent "| Boxed_Bool !Bool"
-    , indent "| Boxed_Char !Char"
-    , indent "| Boxed_Int !Int"
-    , indent "| Boxed_Real !Real"
-    , indent "| Boxed_String !String"
-    , indent "| .."
+    , "         | Boxed_Bool !Bool"
+    , "         | Boxed_Char !Char"
+    , "         | Boxed_Int !Int"
+    , "         | Boxed_Real !Real"
+    , "         | Boxed_String !String"
+    , "         | .."
     , blank
     , "unbox_Bool (Boxed_Bool x) :== x"
     , "unbox_Char (Boxed_Char x) :== x"
@@ -93,8 +90,8 @@ cgPredefined = vsep
     , blank
     , "clean_System_write_String world (Boxed_String str) | clean_Prim_toStdout str :== Nothing"
     , "clean_System_read_String world"
-    , indent "# (str, ok) = clean_Prim_fromStdin"
-    , indent "| ok :== Boxed_String str"
+    , "  # (str, ok) = clean_Prim_fromStdin"
+    , "  | ok :== Boxed_String str"
     , "clean_System_numArgs world :== Boxed_Int (fst clean_Prim_args)"
     --cgForeign (FApp C_IntT [FUnknown,FCon C_IntNative]) (FStr "idris_numArgs") [] =
     , "clean_System_getArgs (Boxed_Int idx) :== Boxed_String ((snd clean_Prim_args) !! idx)"
@@ -102,33 +99,33 @@ cgPredefined = vsep
     , blank
     , "clean_Prim_toStdout :: !String -> Bool"
     , "clean_Prim_toStdout str = code inline {"
-    , indent ".d 1 0"
-    , indent $ indent "jsr stdioF"
-    , indent ".o 1 2 f"
-    , indent ".d 1 2 f"
-    , indent $ indent "jsr writeFS"
-    , indent ".o 0 2 f"
-    , indent ".d 0 2 f"
-    , indent $ indent "jsr closeF"
-    , indent ".o 0 1 b"
+    , "  .d 1 0"
+    , "    jsr stdioF"
+    , "  .o 1 2 f"
+    , "  .d 1 2 f"
+    , "    jsr writeFS"
+    , "  .o 0 2 f"
+    , "  .d 0 2 f"
+    , "    jsr closeF"
+    , "  .o 0 1 b"
     , "}"
     , "clean_Prim_fromStdin :: (!String,!Bool)"
     , "clean_Prim_fromStdin = code inline {"
-    , indent ".d 0 0"
-    , indent $ indent "jsr stdioF"
-    , indent ".o 0 2 f"
-    , indent ".d 0 2 f"
-    , indent $ indent "jsr readLineF"
-    , indent ".o 1 2 f"
-    , indent ".d 1 2 f"
-    , indent $ indent "jsr closeF"
-    , indent ".o 1 1 b"
+    , "  .d 0 0"
+    , "    jsr stdioF"
+    , "  .o 0 2 f"
+    , "  .d 0 2 f"
+    , "    jsr readLineF"
+    , "  .o 1 2 f"
+    , "  .d 1 2 f"
+    , "    jsr closeF"
+    , "  .o 1 1 b"
     , "}"
     , "clean_Prim_args :: (!Int, [String])"
     , "clean_Prim_args"
-    , indent "# argc = readInt32Z global_argc 0"
-    , indent "# argv = derefInt global_argv"
-    , indent "= (argc, [derefString (readInt argv (i << (IF_INT_64_OR_32 3 2)) ) \\\\ i <- [0..argc - 1]])"
+    , "  # argc = readInt32Z global_argc 0"
+    , "  # argv = derefInt global_argv"
+    , "  = (argc, [derefString (readInt argv (i << (IF_INT_64_OR_32 3 2)) ) \\\\ i <- [0..argc - 1]])"
     ]
 cgStart = vsep
     [ "Start =" <+> cgFunName (MN 0 "runMain") ]
@@ -137,8 +134,7 @@ cgStart = vsep
 
 cgConstructors :: [(Name, DDecl)] -> Doc
 cgConstructors decls =
-    ":: Value" <$>
-    indent (vsep $ map (cgCon . snd) decls)
+    ":: Value" <+> align (vsep $ map (cgCon . snd) decls)
 
 cgCon :: DDecl -> Doc
 cgCon (DConstructor name tag arity) =
@@ -158,8 +154,8 @@ cgFun (DFun name args def) =
     cgFunName name <+> "::" <+> (if arity > 0
         then hsep (replicate arity "!Value") <+> "->"
         else empty) <+> "Value" <$>
-    cgFunName name <+> hsep (map cgVarName args) <+> char '=' <$>
-    indent (cgExp def)
+    cgFunName name <+> hsep (map cgVarName args) <$>
+    char '=' <+> align (cgExp def)
 
 cgExp :: DExp -> Doc
 cgExp (DV var) =
@@ -216,14 +212,13 @@ cgLet name def rest =
     --FIXME should be strict always?
     "let" <+> cgVarName name <+> char '=' <+> cgExp def <$>
     "in " <+> align (
-        cgExp rest <$>
-        blank
+        cgExp rest
     )
 
 cgIfThenElse :: DExp -> DExp -> DExp -> Doc
 cgIfThenElse test thenAlt elseAlt =
-    "if" <+> cgUnbox BBool (cgExp test) <$>
-    indent (
+    "if" <+> align (
+        cgUnbox BBool (cgExp test) <$>
         parens (cgExp thenAlt) <$>
         parens (cgExp elseAlt)
     )
@@ -231,17 +226,18 @@ cgIfThenElse test thenAlt elseAlt =
 cgCase :: DExp -> [DAlt] -> Doc
 cgCase exp alts =
     -- parens for `case` in `case`
-    parens $ "case" <+> cgExp exp <+> "of" <$>
-    -- double indent for `case` in `let`
-    indent (indent (vsep (map cgAlt alts)))
+    parens $ "case" <+> align (
+        cgExp exp <+> "of" <$>
+        vsep (map cgAlt alts)
+    )
 
 cgAlt :: DAlt -> Doc
 cgAlt (DConCase _tag name args exp) =
-    cgConName name <+> hsep (map cgVarName args) <+> "->" <+> cgExp exp
+    cgConName name <+> hsep (map cgVarName args) <+> "->" <+> align (cgExp exp)
 cgAlt (DConstCase const exp) =
-    cgConst const <+> "->" <+> cgExp exp
+    cgConst const <+> "->" <+> align (cgExp exp)
 cgAlt (DDefaultCase exp) =
-    char '_' <+> "->" <+> cgExp exp
+    char '_' <+> "->" <+> align (cgExp exp)
 
 -- Foreign Calls ---------------------------------------------------------------
 
