@@ -125,6 +125,8 @@ cgPredefined = vsep
     , "  # argc = readInt32Z global_argc 0"
     , "  # argv = derefInt global_argv"
     , "  = (argc, [derefString (readInt argv (i << (IF_INT_64_OR_32 3 2)) ) \\\\ i <- [0..argc - 1]])"
+    , "clean_Prim_force :: !a -> a"
+    , "clean_Prim_force a = a"--FIXME
     ]
 cgStart = vsep
     [ "Start =" <+> cgFunName (MN 0 "runMain") ]
@@ -159,12 +161,18 @@ cgFun (LFun _opt name args def) =
 cgExp :: LExp -> Doc
 cgExp (LV var) =
     cgVar var
+cgExp (LLazyApp fun args) =
+    cgFn (cgFunName fun) args
 cgExp (LApp _istail (LV (Glob fun)) args) =
     cgFn (cgFunName fun) args
 cgExp (LApp _istail exp args) =
     cgApp exp args
 cgExp (LLet name def rest) =
     cgLet name def rest
+cgExp (LForce (LLazyApp n args)) =
+    cgExp $ LApp False (LV (Glob n)) args
+cgExp (LForce exp) =
+    cgFn "clean_Prim_force" [exp]
 cgExp (LProj def idx) =
     cgUnsupported "PROJECT" (def, idx)
 -- Constructors: False, True
