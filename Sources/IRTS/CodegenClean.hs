@@ -64,6 +64,7 @@ cgImports, cgPredefined, cgStart :: Doc
 cgImports = vsep $ map ("import" <+>)
     [ "StdEnv"
     , "StdPointer"
+    , "StdInteger"
     ]
 cgPredefined = vsep
     [ ":: Value = Nothing"
@@ -72,6 +73,7 @@ cgPredefined = vsep
     , "         | Boxed_Int !Int"
     , "         | Boxed_Real !Real"
     , "         | Boxed_String !String"
+    , "         | Boxed_Integer !Integer"
     , "         | .."
     , blank
     , "unbox_Bool (Boxed_Bool x) :== x"
@@ -79,6 +81,7 @@ cgPredefined = vsep
     , "unbox_Int (Boxed_Int x) :== x"
     , "unbox_Real (Boxed_Real x) :== x"
     , "unbox_String (Boxed_String x) :== x"
+    , "unbox_Integer (Boxed_Integer x) :== x"
     , blank
     , "clean_String_cons (Boxed_Char chr) (Boxed_String str) :== Boxed_String (toString chr +++ str)"
     , "clean_String_reverse (Boxed_String str) :== Boxed_String { str.[i] \\\\ i <- reverse [0..size str - 1] }"
@@ -235,7 +238,7 @@ cgAlt :: DAlt -> Doc
 cgAlt (DConCase _tag name args exp) =
     cgConName name <+> hsep (map cgVarName args) <+> "->" <+> align (cgExp exp)
 cgAlt (DConstCase const exp) =
-    cgConst const <+> "->" <+> align (cgExp exp)
+    cgConstPat const <+> "->" <+> align (cgExp exp)
 cgAlt (DDefaultCase exp) =
     char '_' <+> "->" <+> align (cgExp exp)
 
@@ -253,7 +256,9 @@ cgForeign fun ret args =
 
 cgConst :: Const -> Doc
 cgConst (I i)   = cgBox BInt $ int i
-cgConst (BI i)  = cgBox BInt $ if validInt i then integer i else cgUnsupported "BIG INTEGER VALUE" i
+cgConst (BI i)  = cgBox BInteger $ if validInt i
+    then "{integer_s = " <> integer i <> ", integer_a = {}}"
+    else appPrefix "toInteger" [dquotes . string . show $ i]
 -- Translate all bit types to `BInt`, Clean doesn't have different integer sizes.
 cgConst (B8 i)  = cgBox BInt . string . show $ i
 cgConst (B16 i) = cgBox BInt . string . show $ i
@@ -263,6 +268,12 @@ cgConst (Fl d)  = cgBox BReal . string . fixExponent . show $ d
 cgConst (Ch c)  = cgBox BChar . squotes . string . cgEscape False $ c
 cgConst (Str s) = cgBox BString . dquotes . string . concatMap (cgEscape True) $ s
 cgConst c       = cgUnsupported "CONSTANT" c
+
+cgConstPat :: Const -> Doc
+cgConstPat (BI i) = "Boxed_Integer i | i ==" <+> if validInt i
+    then "{integer_s = " <> integer i <> ", integer_a = {}}"
+    else appPrefix "toInteger" [dquotes . string . show $ i]
+cgConstPat c = cgConst c
 
 cgEscape :: Bool -> Char -> String
 cgEscape True '"' = "\\\""
@@ -323,14 +334,17 @@ cgPrim LReadStr  = cgFn "clean_System_read_String"
 
 --cgPrim (LExternal n) = cgExtern $ show n
 
-cgPrim (LChInt ty)    = cgReboxFn BChar (cgITy ty) "toInt"
-cgPrim (LIntCh ty)    = cgReboxFn (cgITy ty) BChar "toChar"
-cgPrim (LIntStr ty)   = cgReboxFn (cgITy ty) BString "toString"
-cgPrim (LStrInt ty)   = cgReboxFn BString (cgITy ty) "toInt"
-cgPrim (LIntFloat ty) = cgReboxFn (cgITy ty) BReal "toReal"
-cgPrim (LFloatInt ty) = cgReboxFn BReal (cgITy ty) "toInt"
-cgPrim LFloatStr      = cgReboxFn BReal BString "toString"
-cgPrim LStrFloat      = cgReboxFn BString BReal "toReal"
+cgPrim (LChInt ITBig)    = cgReboxFn BChar BInteger "toInteger"
+cgPrim (LChInt ty)       = cgReboxFn BChar (cgITy ty) "toInt"
+cgPrim (LIntCh ty)       = cgReboxFn (cgITy ty) BChar "toChar"
+cgPrim (LIntStr ty)      = cgReboxFn (cgITy ty) BString "toString"
+cgPrim (LStrInt ITBig)   = cgReboxFn BString BInteger "toInteger"
+cgPrim (LStrInt ty)      = cgReboxFn BString (cgITy ty) "toInt"
+cgPrim (LIntFloat ty)    = cgReboxFn (cgITy ty) BReal "toReal"
+cgPrim (LFloatInt ITBig) = cgReboxFn BReal BInteger "toInteger"
+cgPrim (LFloatInt ty)    = cgReboxFn BReal (cgITy ty) "toInt"
+cgPrim LFloatStr         = cgReboxFn BReal BString "toString"
+cgPrim LStrFloat         = cgReboxFn BString BReal "toReal"
 
 cgPrim LFExp    = cgPrimFn BReal "exp"
 cgPrim LFLog    = cgPrimFn BReal "log"
@@ -360,6 +374,7 @@ data BoxedTy
     | BInt
     | BReal
     | BString
+    | BInteger
 
 instance Pretty BoxedTy where
     pretty BBool = "Bool"
@@ -367,13 +382,14 @@ instance Pretty BoxedTy where
     pretty BInt = "Int"
     pretty BReal = "Real"
     pretty BString = "String"
+    pretty BInteger = "Integer"
 
 -- Translate all `IntTy`s to `BInt` except for characters.
 -- FIXME No good for `Integer`, but it it used as an intermediate result in
 -- multiple basic Idris functions like `String` lengths etc.
 cgITy :: IntTy -> BoxedTy
 cgITy ITNative = BInt
-cgITy ITBig = BInt
+cgITy ITBig = BInteger
 cgITy ITChar = BChar
 cgITy (ITFixed IT8) = BInt
 cgITy (ITFixed IT16) = BInt
