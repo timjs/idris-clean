@@ -16,12 +16,14 @@ import Data.Vect
 data F = MkF Integer Integer Integer
 
 -- Prints the list of digits by groups of 10
-loop : Nat -> Nat -> List Integer -> IO()
-loop n k' Nil         = putStrLn $ (pack $ Vect.replicate n ' ') ++ "\t:" ++ show k'
-loop Z k' xs          = do putStrLn ("\t:"++show k')
-                           loop 10 k' xs
-loop (S k) k' (x::xs) = do putStr (show x)
-                           loop k (S k') xs
+loop : Nat -> Nat -> List Integer -> IO ()
+loop n k' Nil = putStrLn $ (pack $ Vect.replicate n ' ') ++ "\t:" ++ show k'
+loop Z k' xs = do
+    putStrLn ("\t:"++show k')
+    loop 10 k' xs
+loop (S k) k' (x::xs) = do
+    putStr (show x)
+    loop k (S k') xs
 
 fn : Integer -> F
 fn k = MkF k (4*k+2) (2*k+1)
@@ -35,10 +37,11 @@ comp (MkF q r t) (MkF u v x) = MkF (q*u) (q*v+r*x) (t*x)
 -- Returns the list of digits of pi. Memory hungry.
 str : F -> Integer -> Nat -> List Integer
 str _ _ Z     = Nil
-str z k (S n) = if(y == flr 4 z)
-                   then y :: str (comp (MkF 10 (-10*y) 1) z    ) k     n
-                   else      str (comp z                 (fn k)) (k+1) (S n)
-  where y = flr 3 z
+str z k (S n) =
+    if y == flr 4 z
+        then y :: str (comp (MkF 10 (-10*y) 1) z    ) k     n
+        else      str (comp z                 (fn k)) (k+1) (S n)
+    where y = flr 3 z
 
 pidigit : IO ()
 pidigit = do
