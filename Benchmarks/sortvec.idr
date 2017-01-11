@@ -19,7 +19,8 @@ mkSortVec Z = pure []
 mkSortVec (S k) = pure (fromInteger !(rndInt 0 10000) :: !(mkSortVec k))
 
 main : IO ()
-main = do (_ :: arg :: _) <- getArgs
-          let vec = runPure $ (srand 123456789 *> mkSortVec (fromInteger (cast arg)))
-          putStrLn "Made vector"
-          printLn (vsort vec)
+main = do
+    (_ :: arg :: _) <- getArgs
+    let vec = runPure $ (srand 123456789 *> mkSortVec (fromInteger (cast arg)))
+    putStrLn "Made vector"
+    printLn (vsort vec)
