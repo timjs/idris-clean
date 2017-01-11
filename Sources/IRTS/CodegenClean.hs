@@ -67,34 +67,23 @@ cgImports = vsep $ map ("import" <+>)
     ]
 cgPredefined = vsep
     [ ":: Value = Nothing"
-    , "         | Boxed_Bool !Bool"
-    , "         | Boxed_Char !Char"
-    , "         | Boxed_Int !Int"
-    , "         | Boxed_Real !Real"
-    , "         | Boxed_String !String"
     , "         | .."
     , blank
-    , "unbox_Bool (Boxed_Bool x) :== x"
-    , "unbox_Char (Boxed_Char x) :== x"
-    , "unbox_Int (Boxed_Int x) :== x"
-    , "unbox_Real (Boxed_Real x) :== x"
-    , "unbox_String (Boxed_String x) :== x"
+    , "clean_String_cons chr str :== toString chr +++ str"
+    , "clean_String_reverse str :== { str.[i] \\\\ i <- reverse [0..size str - 1] }"
+    , "clean_String_head str :== select str 0"
+    , "clean_String_tail str :== str % (1, size str - 1)"
+    , "clean_String_index str i :== select str i"
+    , "clean_String_len str :== size str"
+    , "clean_String_substring ofs len str :== str % (ofs, ofs + len - 1)"
     , blank
-    , "clean_String_cons (Boxed_Char chr) (Boxed_String str) :== Boxed_String (toString chr +++ str)"
-    , "clean_String_reverse (Boxed_String str) :== Boxed_String { str.[i] \\\\ i <- reverse [0..size str - 1] }"
-    , "clean_String_head (Boxed_String str) :== Boxed_Char (select str 0)"
-    , "clean_String_tail (Boxed_String str) :== Boxed_String (str % (1, size str - 1))"
-    , "clean_String_index (Boxed_String str) (Boxed_Int i) :== Boxed_Char (select str i)"
-    , "clean_String_len (Boxed_String str) :== Boxed_Int (size str)"
-    , "clean_String_substring (Boxed_Int ofs) (Boxed_Int len) (Boxed_String str) :== Boxed_String (str % (ofs, ofs + len - 1))"
-    , blank
-    , "clean_System_write_String world (Boxed_String str) | clean_Prim_toStdout str :== Nothing"
+    , "clean_System_write_String world str | clean_Prim_toStdout str :== Nothing"
     , "clean_System_read_String world"
     , "  # (str, ok) = clean_Prim_fromStdin"
-    , "  | ok :== Boxed_String str"
-    , "clean_System_numArgs world :== Boxed_Int (fst clean_Prim_args)"
+    , "  | ok :== str"
+    , "clean_System_numArgs world :== fst clean_Prim_args"
     --cgForeign (FApp C_IntT [FUnknown,FCon C_IntNative]) (FStr "idris_numArgs") [] =
-    , "clean_System_getArgs (Boxed_Int idx) :== Boxed_String ((snd clean_Prim_args) !! idx)"
+    , "clean_System_getArgs idx :== (snd clean_Prim_args) !! idx"
     --cgForeign (FCon C_Str) (FStr "idris_getArg") [(FApp C_IntT [FUnknown,FCon C_IntNative], exp)] =
     , blank
     , "clean_Prim_toStdout :: !String -> Bool"
@@ -223,7 +212,7 @@ cgLet name def rest =
 cgIfThenElse :: DExp -> DExp -> DExp -> Doc
 cgIfThenElse test thenAlt elseAlt =
     "if" <+> align (
-        cgUnbox BBool (cgExp test) <$>
+        cgUnsafeCoerce (cgExp test) <$>
         parens (cgExp thenAlt) <$>
         parens (cgExp elseAlt)
     )
@@ -232,7 +221,7 @@ cgCase :: DExp -> [DAlt] -> Doc
 cgCase exp alts =
     -- parens for `case` in `case`
     parens $ "case" <+> align (
-        cgExp exp <+> "of" <$>
+        cgUnsafeCoerce (cgExp exp) <+> "of" <$>
         vsep (map cgAlt alts)
     )
 
@@ -395,14 +384,14 @@ cgUnsafeCoerce :: Doc -> Doc
 cgUnsafeCoerce exp = appPrefix "clean_Prim_unsafeCoerce" [exp]
 
 cgBox, cgUnbox :: BoxedTy -> Doc -> Doc
-cgBox ty exp = appPrefix ("Boxed_" <> pretty ty) [exp]
-cgUnbox ty exp = appPrefix ("unbox_" <> pretty ty) [exp]
+cgBox ty exp = exp
+cgUnbox ty exp = exp
 
 cgRebox :: (Doc -> [Doc] -> Doc) -> BoxedTy -> BoxedTy -> Doc -> [DExp] -> Doc
 cgRebox app from to fun = cgBox to . app fun . map (cgUnbox from . cgExp)
 
 cgFn :: Doc -> [DExp] -> Doc
-cgFn fun args = appPrefix fun (map cgExp args)
+cgFn fun args = appPrefix fun (map (cgUnsafeCoerce . cgExp) args)
 
 cgVar :: LVar -> Doc
 cgVar (Loc idx) = cgLoc idx --FIXME not in ir?
