@@ -68,7 +68,8 @@ cgImports = vsep $ map ("import" <+>)
     , "StdPointer"
     ]
 cgPredefined = vsep
-    [ ":: Value = Nothing"
+    [ ":: Value a b c d e f g h i j k l m n o p"
+    , indent "= Nothing"
     , indent "| Boxed_Bool !Bool"
     , indent "| Boxed_Char !Char"
     , indent "| Boxed_Int !Int"
@@ -136,14 +137,14 @@ cgStart = vsep
 
 cgConstructors :: [(Name, LDecl)] -> Doc
 cgConstructors decls =
-    ":: Value" <$>
+    ":: Value a b c d e f g h i j k l m n o p" <$>
     indent (vsep $ map (cgCon . snd) decls)
 
 cgCon :: LDecl -> Doc
 cgCon (LConstructor name tag arity) =
     --FIXME strictness
     "///" <+> string (show name) <+> parens (int tag) <$>
-    char '|' <+> cgConName name <+> hsep (replicate arity "!Value")
+    char '|' <+> cgConName name <+> hsep (take arity cgPolyArgs)
 
 cgFunctions :: [(Name, LDecl)] -> Doc
 cgFunctions = vsep . map (cgFun . snd)
@@ -159,6 +160,9 @@ cgFun (LFun _opt name args def) =
         -- else empty) <+> "Value" <$>
     cgFunName name <+> hsep (map cgVarName args) <+> char '=' <$>
     indent (cgExp def)
+
+cgPolyArgs :: [Doc]
+cgPolyArgs = [ string ['!',c] | c <- ['a'..'z'] ]
 
 cgExp :: LExp -> Doc
 cgExp (LV var) =
