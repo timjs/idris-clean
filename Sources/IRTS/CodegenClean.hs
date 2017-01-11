@@ -126,9 +126,14 @@ cgPredefined = vsep
     , "  # argc = readInt32Z global_argc 0"
     , "  # argv = derefInt global_argv"
     , "  = (argc, [derefString (readInt argv (i << (IF_INT_64_OR_32 3 2)) ) \\\\ i <- [0..argc - 1]])"
+    , "clean_Prim_unsafeCoerce :: a -> b"
+    , "clean_Prim_unsafeCoerce x = code inline {"
+    , "  pop_a 0"
+    , "}"
     ]
 cgStart = vsep
-    [ "Start =" <+> cgFunName (MN 0 "runMain") ]
+    [ "Start :: !Value"
+    , "Start =" <+> cgFunName (MN 0 "runMain") ]
 
 -- Declarations and Expressions ------------------------------------------------
 
@@ -151,9 +156,9 @@ cgFun (DFun name args def) =
     blank <$>
     "///" <+> (string . show) name <$>
     "///" <+> (string . deline . show) def <$>
-    cgFunName name <+> "::" <+> (if arity > 0
-        then hsep (replicate arity "!Value") <+> "->"
-        else empty) <+> "Value" <$>
+    -- cgFunName name <+> "::" <+> (if arity > 0
+        -- then hsep (replicate arity "!Value") <+> "->"
+        -- else empty) <+> "Value" <$>
     cgFunName name <+> hsep (map cgVarName args) <$>
     char '=' <+> align (cgExp def)
 
@@ -385,6 +390,9 @@ cgATy ATFloat = BReal
 cgATy (ATInt ity) = cgITy ity
 
 -- Names & Applications --------------------------------------------------------
+
+cgUnsafeCoerce :: Doc -> Doc
+cgUnsafeCoerce exp = appPrefix "clean_Prim_unsafeCoerce" [exp]
 
 cgBox, cgUnbox :: BoxedTy -> Doc -> Doc
 cgBox ty exp = appPrefix ("Boxed_" <> pretty ty) [exp]
