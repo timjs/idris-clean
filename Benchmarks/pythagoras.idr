@@ -12,5 +12,5 @@ pythagoras max = [
 
 main : IO ()
 main = do
-  [_, n] <- getArgs
-  printLn $ pythagoras (cast n)
+  arg <- getLine
+  printLn $ pythagoras (cast arg)

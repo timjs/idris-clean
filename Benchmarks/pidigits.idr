@@ -45,8 +45,8 @@ str z k (S n) =
 
 main : IO ()
 main = do
-  [_,a] <- getArgs
-  let n = fromIntegerNat (the Integer (cast a))
+  arg <- getLine
+  let n = fromInteger (cast arg)
   let l = str (MkF 1 0 1) 1 n
   loop 10 0 l
   pure ()
