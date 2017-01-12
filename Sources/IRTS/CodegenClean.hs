@@ -125,7 +125,10 @@ cgCon :: LDecl -> Doc
 cgCon (LConstructor name tag arity) =
     --FIXME strictness
     "///" <+> string (show name) <+> parens (int tag) <$>
-    char '|' <+> cgConName name <+> hsep (replicate arity "!Value")
+    char '|' <+> cgConName name <+> hsep (take arity cgUniversalVars)
+
+cgUniversalVars :: [Doc]
+cgUniversalVars = [ "!(A." <> var <> ": " <> var <> ")" | var <- map char ['a'..'z'] ]
 
 cgFunctions :: [(Name, LDecl)] -> Doc
 cgFunctions = vsep . map (cgFun . snd)
