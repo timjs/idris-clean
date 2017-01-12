@@ -2,6 +2,8 @@ rule idris
     command = idris -p contrib -p effects $in -o $out
 rule idris-clean
     command = idris-codegen-clean $in -o $out
+rule idris-malfunction
+    command = idris-codegen-malfunction $in -o $out
 rule idris-php
     command = idris-codegen-php $in -o $out
 rule clean
