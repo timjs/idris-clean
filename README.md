@@ -108,6 +108,7 @@ Not all features of Idris are already implemented.
 Some known bugs/limitations:
 
 - `BigInt`s are implemented as native ABC `Int`s and are **not checked on overflow**.
+  An experimental implementation with `BigInt` support can be found in the branch [`bigint`](https://github.com/timjs/idris-clean/tree/bigint)
 - No FFI
 - No unboxing
 
