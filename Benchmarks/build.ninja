@@ -1,14 +1,12 @@
 include ../rules.ninja
 
-# build fasta-id | fasta.ibc: idris fasta.idr
-# build fasta.icl: idris-clean fasta.ibc
-# build fasta-cl: clean fasta.icl
-# build fasta-mf: idris-malfunction fasta.ibc
+build fasta-id | fasta.ibc: idris fasta.idr
+build fasta.icl: idris-clean fasta.ibc
+build fasta-cl: clean fasta.icl
 
 build pidigits-id | pidigits.ibc: idris pidigits.idr
 build pidigits.icl: idris-clean pidigits.ibc
 build pidigits-cl: clean pidigits.icl
-build pidigits-mf: idris-malfunction pidigits.ibc
 
 # build quasigroups-id | quasigroups.ibc: idris quasigroups.idr
 # build quasigroups.icl: idris-clean quasigroups.ibc
@@ -17,9 +15,7 @@ build pidigits-mf: idris-malfunction pidigits.ibc
 build sortvec-id | sortvec.ibc: idris sortvec.idr
 build sortvec.icl: idris-clean sortvec.ibc
 build sortvec-cl: clean sortvec.icl
-build sortvec-mf: idris-malfunction sortvec.ibc
 
 build pythagoras-id | pythagoras.ibc: idris pythagoras.idr
 build pythagoras.icl: idris-clean pythagoras.ibc
 build pythagoras-cl: clean pythagoras.icl
-build pythagoras-mf: idris-malfunction pythagoras.ibc
