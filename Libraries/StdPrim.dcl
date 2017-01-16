@@ -9,8 +9,8 @@ system module StdPrim
 
 clean_Misc_abort :: !String -> .a
 clean_Misc_noop :: .a
-clean_Misc_id :: .a -> .a
-clean_Misc_coerce :: .a -> .b
+clean_Misc_id :: !.a -> .a
+clean_Misc_coerce :: !.a -> .b
 clean_Misc_force :: !.a -> .a
 
 /// # Booleans
@@ -34,6 +34,9 @@ clean_Char_lt :: !Char !Char -> Bool
 
 clean_Char_setLowercaseBit :: !Char -> Char
 clean_Char_unsetLowercaseBit :: !Char -> Char
+
+clean_Char_add :: !Char !Char -> Char
+clean_Char_sub :: !Char !Char -> Char
 
 /// # Integers
 
@@ -179,6 +182,7 @@ clean_Int_toReal :: !Int -> Real
 clean_Int_toString :: !Int -> String
 
 clean_Real_toInt :: !Real -> Int
-// clean_real_toString :: !Real -> String
+clean_Real_toString :: !Real -> String
 
 clean_String_toInt :: !String -> Int
+clean_String_toReal :: !String -> Real
