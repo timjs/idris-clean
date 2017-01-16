@@ -16,7 +16,7 @@ import Data.Vect
 data F = MkF Integer Integer Integer
 
 -- Prints the list of digits by groups of 10
-loop : Nat -> Nat -> List Integer -> IO()
+loop : Nat -> Nat -> List Integer -> IO ()
 loop n k' Nil = putStrLn $ (pack $ Vect.replicate n ' ') ++ "\t:" ++ show k'
 loop Z k' xs = do
     putStrLn ("\t:" ++ show k')
@@ -45,8 +45,8 @@ str z k (S n) =
 
 main : IO ()
 main = do
-  arg <- getLine
-  let n = fromInteger (cast arg)
-  let l = str (MkF 1 0 1) 1 n
-  loop 10 0 l
-  pure ()
+    arg <- getLine
+    let n = fromInteger (cast arg)
+    let l = str (MkF 1 0 1) 1 n
+    loop 10 0 l
+    pure ()
