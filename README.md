@@ -65,11 +65,11 @@ $ cabal install
 This should download all dependencies (including Idris itself).
 
 In the mean time (compiling Haskell takes a long time...) install Clean from ftp://ftp.cs.ru.nl/pub/Clean/builds/.
-Download a `clean-classic-<your-platform>-<todays-date>.tgz` tarball (nothing with `itasks` in it), unpack and run `make`.
+Download a `clean-classic-<your-platform>-<todays date>.tgz` tarball (nothing with `itasks` in it), unpack and run `make`.
 Don't forget to append `clean/bin/` and `clean/lib/exe/` to your `$PATH`.
 
 ```shell
-$ tar -xzf clean-classic-<your plafrom>-<todays-date>.tgz
+$ tar -xzf clean-classic-<your plafrom>-<todays date>.tgz
 $ cd clean
 $ make
 $ export PATH <path to clean>/bin/:<path to clean>/lib/exe/:$PATH
