@@ -122,13 +122,13 @@ cgConstructors decls =
     ":: Value" <+> align (vsep $ map (cgCon . snd) decls)
 
 cgCon :: LDecl -> Doc
-cgCon (LConstructor name tag arity) =
+cgCon (LConstructor name tag arity basicty) =
     --FIXME strictness
-    "///" <+> string (show name) <+> parens (int tag) <$>
-    char '|' <+> cgConName name <+> hsep (take arity cgUniversalVars)
+    "///" <+> string (show name) <+> parens (int tag) <+> string (show basicty) <$>
+    char '|' <+> cgConName name <+> hsep (map (cgStrict . cgParam) basicty)
 
-cgUniversalVars :: [Doc]
-cgUniversalVars = [ "!(A." <> var <> ": " <> var <> ")" | var <- map char ['a'..'z'] ]
+cgParam :: BasicTy -> Doc
+cgParam = pretty . cgBTy
 
 cgFunctions :: [(Name, LDecl)] -> Doc
 cgFunctions = vsep . map (cgFun . snd)
@@ -164,9 +164,9 @@ cgExp (LProj def idx) =
     cgUnsupported "PROJECT" (def, idx)
 -- Constructors: False, True
 -- cgExp (LCon _ 0 name []) | name == falseName =
---     cgBox BBool "False"
+--     cgBox RTBool "False"
 -- cgExp (LCon _ 1 name []) | name == trueName =
---     cgBox BBool "True"
+--     cgBox RTBool "True"
 -- Constructors: rest
 cgExp (LCon _reloc _tag name args) =
     --FIXME optimize to Int for argless ctors
@@ -249,7 +249,7 @@ cgForeign fun ret args =
 cgConst :: Const -> Doc
 cgConst (I i)   = int i
 cgConst (BI i)  = if validInt i then integer i else cgUnsupported "BIG INTEGER VALUE" i
--- Translate all bit types to `BInt`, Clean doesn't have different integer sizes.
+-- Translate all bit types to `RTInt`, Clean doesn't have different integer sizes.
 cgConst (B8 i)  = string . show $ i
 cgConst (B16 i) = string . show $ i
 cgConst (B32 i) = string . show $ i
@@ -301,76 +301,89 @@ cgPrim (LZExt _ _)    = cgFn "clean_Misc_id"
 cgPrim (LBitCast _ _) = cgFn "clean_Misc_id"
 cgPrim (LTrunc _ _)   = cgFn "clean_Misc_id"
 
-cgPrim LStrConcat = cgOp BString "concat"
-cgPrim LStrLt     = cgOp BString "lt"
-cgPrim LStrEq     = cgOp BString "eq"
+cgPrim LStrConcat = cgOp RTString "concat"
+cgPrim LStrLt     = cgOp RTString "lt"
+cgPrim LStrEq     = cgOp RTString "eq"
 
-cgPrim LStrRev    = cgOp BString "reverse"
-cgPrim LStrCons   = cgOp BString "cons"
-cgPrim LStrHead   = cgOp BString "head"
-cgPrim LStrTail   = cgOp BString "tail"
-cgPrim LStrIndex  = cgOp BString "index"
-cgPrim LStrLen    = cgOp BString "len"
-cgPrim LStrSubstr = cgOp BString "substring"
+cgPrim LStrRev    = cgOp RTString "reverse"
+cgPrim LStrCons   = cgOp RTString "cons"
+cgPrim LStrHead   = cgOp RTString "head"
+cgPrim LStrTail   = cgOp RTString "tail"
+cgPrim LStrIndex  = cgOp RTString "index"
+cgPrim LStrLen    = cgOp RTString "len"
+cgPrim LStrSubstr = cgOp RTString "substring"
 
 cgPrim LWriteStr = cgFn "clean_System_write_String"
 cgPrim LReadStr  = cgFn "clean_System_read_String"
 
 --cgPrim (LExternal n) = cgExtern $ show n
 
-cgPrim (LChInt ty)    = cgOp BChar "toInt"
+cgPrim (LChInt ty)    = cgOp RTChar "toInt"
 cgPrim (LIntCh ty)    = cgOp (cgITy ty) "toChar"
 cgPrim (LIntStr ty)   = cgOp (cgITy ty) "toString"
-cgPrim (LStrInt ty)   = cgOp BString "toInt"
+cgPrim (LStrInt ty)   = cgOp RTString "toInt"
 cgPrim (LIntFloat ty) = cgOp (cgITy ty) "toReal"
-cgPrim (LFloatInt ty) = cgOp BReal "toInt"
-cgPrim LFloatStr      = cgOp BReal "toString"
-cgPrim LStrFloat      = cgOp BString "toReal"
+cgPrim (LFloatInt ty) = cgOp RTReal "toInt"
+cgPrim LFloatStr      = cgOp RTReal "toString"
+cgPrim LStrFloat      = cgOp RTString "toReal"
 
-cgPrim LFExp    = cgOp BReal "exp"
-cgPrim LFLog    = cgOp BReal "log"
-cgPrim LFSin    = cgOp BReal "sin"
-cgPrim LFCos    = cgOp BReal "cos"
-cgPrim LFTan    = cgOp BReal "tan"
-cgPrim LFASin   = cgOp BReal "asin"
-cgPrim LFACos   = cgOp BReal "acos"
-cgPrim LFATan   = cgOp BReal "atan"
-cgPrim LFSqrt   = cgOp BReal "sqrt"
-cgPrim LFFloor  = cgOp BReal "entier"
---cgPrim LFCeil   = cgReboxFn BReal BInt "ceil"
-cgPrim LFNegate = cgOp BReal "~" -- \[x] -> text "~" <> x
+cgPrim LFExp    = cgOp RTReal "exp"
+cgPrim LFLog    = cgOp RTReal "log"
+cgPrim LFSin    = cgOp RTReal "sin"
+cgPrim LFCos    = cgOp RTReal "cos"
+cgPrim LFTan    = cgOp RTReal "tan"
+cgPrim LFASin   = cgOp RTReal "asin"
+cgPrim LFACos   = cgOp RTReal "acos"
+cgPrim LFATan   = cgOp RTReal "atan"
+cgPrim LFSqrt   = cgOp RTReal "sqrt"
+cgPrim LFFloor  = cgOp RTReal "entier"
+--cgPrim LFCeil   = cgReboxFn RTReal RTInt "ceil"
+cgPrim LFNegate = cgOp RTReal "~" -- \[x] -> text "~" <> x
 
 cgPrim f = \args -> cgUnsupported "PRIMITIVE" (f, args)
 
-data BoxedTy
-    = BBool
-    | BChar
-    | BInt
-    | BReal
-    | BString
+data RawTy
+    = RTFunc RawTy RawTy
+    | RTBool
+    | RTChar
+    | RTInt
+    | RTReal
+    | RTString
+    | RTFile
+    | RTAny
 
-instance Pretty BoxedTy where
-    pretty BBool = "Bool"
-    pretty BChar = "Char"
-    pretty BInt = "Int"
-    pretty BReal = "Real"
-    pretty BString = "String"
+instance Pretty RawTy where
+    pretty (RTFunc a b) = parens $ pretty a <+> "->" <+> pretty b
+    pretty RTBool = "Bool"
+    pretty RTChar = "Char"
+    pretty RTInt = "Int"
+    pretty RTReal = "Real"
+    pretty RTString = "String"
+    pretty RTFile = "File"
+    pretty RTAny = "Value"
 
--- Translate all `IntTy`s to `BInt` except for characters.
+-- Translate all `IntTy`s to `RTInt` except for characters.
 -- FIXME No good for `Integer`, but it it used as an intermediate result in
 -- multiple basic Idris functions like `String` lengths etc.
-cgITy :: IntTy -> BoxedTy
-cgITy ITNative = BInt
-cgITy ITBig = BInt
-cgITy ITChar = BChar
-cgITy (ITFixed IT8) = BInt
-cgITy (ITFixed IT16) = BInt
-cgITy (ITFixed IT32) = BInt
-cgITy (ITFixed IT64) = BInt
+cgITy :: IntTy -> RawTy
+cgITy ITNative = RTInt
+cgITy ITBig = RTInt
+cgITy ITChar = RTChar
+cgITy (ITFixed IT8) = RTInt
+cgITy (ITFixed IT16) = RTInt
+cgITy (ITFixed IT32) = RTInt
+cgITy (ITFixed IT64) = RTInt
 
-cgATy :: ArithTy -> BoxedTy
-cgATy ATFloat = BReal
+cgATy :: ArithTy -> RawTy
+cgATy ATFloat = RTReal
 cgATy (ATInt ity) = cgITy ity
+
+cgBTy :: BasicTy -> RawTy
+cgBTy BTAny = RTAny
+cgBTy (BTFun a b) = RTFunc (cgBTy a) (cgBTy b)
+cgBTy BTBool = RTBool
+cgBTy BTString = RTString
+cgBTy (BTArith at) = cgATy at
 
 -- Names & Applications --------------------------------------------------------
 
@@ -380,8 +393,14 @@ cgCoerce exp = appPrefix "clean_Misc_coerce" [exp]
 cgFn :: Doc -> [LExp] -> Doc
 cgFn fun args = appPrefix fun (map (cgCoerce . cgExp) args)
 
-cgOp :: BoxedTy -> Doc -> [LExp] -> Doc
+cgOp :: RawTy -> Doc -> [LExp] -> Doc
 cgOp ty fun args = appPrefix ("clean_" <> pretty ty <> "_" <> fun) (map cgExp args)
+
+cgStrict :: Doc -> Doc
+cgStrict d = "!" <> d
+
+cgUniversalVars :: [Doc]
+cgUniversalVars = [ "!(A." <> var <> ": " <> var <> ")" | var <- map char ['a'..'z'] ]
 
 cgVar :: LVar -> Doc
 cgVar (Loc idx) = cgLoc idx --FIXME not in ir?
