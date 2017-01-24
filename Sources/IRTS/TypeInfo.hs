@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 module IRTS.TypeInfo where
 
 import Idris.Core.TT
@@ -8,6 +9,8 @@ import IRTS.Lang
 import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
+
+import Debug.Trace
 
 -- Basic type information propagated through IR's for optimised code generation
 data BasicTy = BTFun BasicTy BasicTy
@@ -25,11 +28,17 @@ mkTyInfo :: [(Name,[Idx])] -> [(Name,TTDecl)] -> TyInfo
 mkTyInfo usageinfos = foldr go Map.empty
   where
     go :: (Name,TTDecl) -> TyInfo -> TyInfo
-    go (name, (TyDecl _ ty,_,_,_,_,_)) = Map.insert name $ irType (fromMaybe useAllArgs $ lookup name usageinfos) ty
+    go (name, (TyDecl TCon{nt_arity} ty,_,_,_,_,_)) = Map.insert name $ irType (useNArgs nt_arity) ty
+    go (name, (TyDecl DCon{} ty,_,_,_,_,_)) = Map.insert name $ irType (fromMaybe useAllArgs $ lookup name usageinfos) ty
     go (name, (CaseOp _ ty _ _ _ _,_,_,_,_,_)) = Map.insert name $ irType useAllArgs ty
+    go (name, (Operator ty _ _,_,_,_,_,_)) = Map.insert name $ irType useAllArgs ty
+    go (name, decl) = trace ("** Couldn't make type info for '" ++ show name ++ "': "++ show decl)
 
     useAllArgs :: [Idx]
     useAllArgs = iterate (+1) 0
+
+    useNArgs :: Int -> [Idx]
+    useNArgs n = take n useAllArgs
 
 irType :: [Idx] -> Type -> [BasicTy]
 irType is ty = select is $ decombine (convert ty) --trace (">> FROM " ++ show ty ++ "\n   TO   " ++ show res) res
@@ -39,6 +48,7 @@ irType is ty = select is $ decombine (convert ty) --trace (">> FROM " ++ show ty
     convert (Constant (AType at)) = BTArith at
     convert (P _ name _)
         | name == sNS (sUN "Bool") ["Bool", "Prelude"] = BTBool
+        | name == sNS (sUN "Nat") ["Nat", "Prelude"] = BTArith (ATInt ITNative)
     convert (Bind _nametype (Pi _rigcount _implicit ty _kind) cont) = BTFun (convert ty) (convert cont)
     convert  _ = BTAny
     --XXX WorldType and VoidType needed?

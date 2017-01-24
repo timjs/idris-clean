@@ -14,6 +14,7 @@ import Idris.Core.Evaluate
 import Numeric (showHex)
 import Data.Char
 import Data.List
+import qualified Data.Map as Map
 import Data.Text.Lazy (Text, pack, unpack)
 import System.IO
 import System.FilePath
@@ -50,8 +51,8 @@ codegenClean usedpos info = do
             [ cgModule (takeBaseName $ outputFile info)
             , cgImports
             , cgPredefined
-            , cgConstructors ctors
-            , cgFunctions funcs
+            , cgConstructors tyinfo ctors
+            , cgFunctions tyinfo funcs
             , cgStart
             , cgTT (ttDecls info) usedpos
             ]
@@ -138,33 +139,39 @@ cgStart = vsep
 
 -- Declarations and Expressions ------------------------------------------------
 
-cgConstructors :: [(Name, LDecl)] -> Doc
-cgConstructors decls =
-    ":: Value" <+> align (vsep $ map (cgCon . snd) decls)
+cgConstructors :: TyInfo -> [(Name, LDecl)] -> Doc
+cgConstructors tyinfo decls =
+    ":: Value" <+> align (vsep $ map (cgCon tyinfo . snd) decls)
 
-cgCon :: LDecl -> Doc
-cgCon (LConstructor name tag arity) =
-    --FIXME strictness
-    "///" <+> string (show name) <+> parens (int tag) <$>
-    char '|' <+> cgConName name <+> hsep (take arity cgUniversalVars)
+cgCon :: TyInfo -> LDecl -> Doc
+cgCon tyinfo (LConstructor name tag arity)
+    | Just basictys <- Map.lookup name tyinfo =
+        "///" <+> string (show name) <+> parens (int arity) <$>
+        "|" <+> cgConName name <+> hsep (map (cgStrict . cgParam) basictys)
+    | otherwise =
+        "/// Lookup error:" <+> string (show name)
 
 cgParam :: BasicTy -> Doc
 cgParam = pretty . cgBTy
 
-cgFunctions :: [(Name, LDecl)] -> Doc
-cgFunctions = vsep . map (cgFun . snd)
+cgFunctions :: TyInfo -> [(Name, LDecl)] -> Doc
+cgFunctions tyinfo = vsep . map (cgFun tyinfo . snd)
 
-cgFun :: LDecl -> Doc
-cgFun (LFun _opt name args def) =
-    let arity = length args in
+cgFun :: TyInfo -> LDecl -> Doc
+cgFun tyinfo (LFun _opt name args def) =
     blank <$>
-    "///" <+> (string . show) name <$>
+    "///" <+> (string . show) name <+> parens (int $ length args)<$>
     "///" <+> (string . deline . show) def <$>
-    -- cgFunName name <+> "::" <+> (if arity > 0
-        -- then hsep (replicate arity "!Value") <+> "->"
-        -- else empty) <+> "Value" <$>
+    (case Map.lookup name tyinfo of
+        Just basictys ->
+            let (argtys, retty) = (init basictys, last basictys) in
+            cgFunName name <+> "::" <+> (if not (null argtys)
+                then hsep (map (cgStrict . cgParam) argtys) <+> "->"
+                else empty) <+> cgParam retty
+        Nothing ->
+            "/// Couldn't lookup basic type") <$>
     cgFunName name <+> hsep (map cgVarName args) <$>
-    char '=' <+> align (cgExp def)
+    "=" <+> align (cgExp def)
 
 cgExp :: LExp -> Doc
 cgExp (LV var) =
@@ -226,7 +233,7 @@ cgApp exp args = appPrefix (parens (cgExp exp)) (map cgExp args)
 cgLet :: Name -> LExp -> LExp -> Doc
 cgLet name def rest =
     --FIXME should be strict always?
-    "let" <+> cgVarName name <+> char '=' <+> cgExp def <$>
+    "let" <+> cgVarName name <+> "=" <+> cgExp def <$>
     "in " <+> align (
         cgExp rest
     )
@@ -253,7 +260,7 @@ cgAlt (LConCase _tag name args exp) =
 cgAlt (LConstCase const exp) =
     cgConst const <+> "->" <+> align (cgExp exp)
 cgAlt (LDefaultCase exp) =
-    char '_' <+> "->" <+> align (cgExp exp)
+    "_" <+> "->" <+> align (cgExp exp)
 
 -- Foreign Calls ---------------------------------------------------------------
 
