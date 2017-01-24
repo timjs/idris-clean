@@ -12,9 +12,9 @@ cabal-version:       >=1.10
 executable idris-codegen-clean
   main-is:             Main.hs
   hs-source-dirs:      Sources
-  other-modules:       IRTS.CodegenClean
+  other-modules:       IRTS.CodegenClean, IRTS.TypeInfo
   -- other-extensions:
-  build-depends:       base, filepath, text, wl-pprint-text, idris
+  build-depends:       base, filepath, text, containers, wl-pprint-text, idris
   default-language:    Haskell2010
 
   ghc-options:         -O2

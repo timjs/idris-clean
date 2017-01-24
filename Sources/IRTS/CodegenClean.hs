@@ -6,8 +6,10 @@ module IRTS.CodegenClean
 import Prelude hiding ((<$>))
 
 import IRTS.CodegenCommon
+import IRTS.TypeInfo
 import IRTS.Lang
 import Idris.Core.TT
+import Idris.Core.Evaluate
 
 import Numeric (showHex)
 import Data.Char
@@ -40,9 +42,10 @@ appInfix op [left, right] = parens $
 
 -- Main and Prelude ------------------------------------------------------------
 
-codegenClean :: CodeGenerator
-codegenClean info = do
+codegenClean :: [(Name,[Int])] -> CodegenInfo -> IO ()
+codegenClean usedpos info = do
     let (funcs, ctors) = partition isFun (liftDecls info)
+    let tyinfo = mkTyInfo usedpos (ttDecls info)
     let output = vsep $ intersperse blank
             [ cgModule (takeBaseName $ outputFile info)
             , cgImports
@@ -50,11 +53,29 @@ codegenClean info = do
             , cgConstructors ctors
             , cgFunctions funcs
             , cgStart
+            , cgTT (ttDecls info) usedpos
             ]
     withFile (outputFile info) WriteMode (`hPutDoc` output)
     where
         isFun (_, LFun{}) = True
         isFun (_, LConstructor{}) = False
+
+cgTT :: [(Name, TTDecl)] -> [(Name, [Int])] -> Doc
+cgTT ttdecls usedpos = "/*" <$> vsep (map go ttdecls) <$> "*/"
+  where
+    go (name, (def, rigcount, inject, access, tot, metainf)) = vsep
+        [ "---" <+> (string . show) name <+> "---"
+        , "RigCount:" <+> (string . show) rigcount
+        , "Injectivity:" <+> (string . show) inject
+        , "Accessibility:" <+> (string . show) access
+        , "Totality:" <+> (string . show) tot
+        , "MetaInformation:" <+> (string . show) metainf
+        , "UsageInformation:" <+> (string . show . lookup name) usedpos
+        , "---"
+        , (string . show) def
+        , "---"
+        , blank
+        ]
 
 cgModule :: String -> Doc
 cgModule name = "module" <+> string name
@@ -122,10 +143,10 @@ cgConstructors decls =
     ":: Value" <+> align (vsep $ map (cgCon . snd) decls)
 
 cgCon :: LDecl -> Doc
-cgCon (LConstructor name tag arity basicty) =
+cgCon (LConstructor name tag arity) =
     --FIXME strictness
-    "///" <+> string (show name) <+> parens (int tag) <+> string (show basicty) <$>
-    char '|' <+> cgConName name <+> hsep (map (cgStrict . cgParam) basicty)
+    "///" <+> string (show name) <+> parens (int tag) <$>
+    char '|' <+> cgConName name <+> hsep (take arity cgUniversalVars)
 
 cgParam :: BasicTy -> Doc
 cgParam = pretty . cgBTy
