@@ -7,7 +7,7 @@ rule idris-malfunction
 rule idris-php
     command = idris-codegen-php $in -o $out
 rule clean
-    command = clm -b -h 209715200 -I ../Libraries $$(basename -s .icl $in) -o $out
+    command = clm -b -lat -h 209715200 -I ../Libraries $$(basename -s .icl $in) -o $out
 rule clean-start
     command = clm -h 209715200 $$(basename -s .icl $in) -o $out
 rule eval

@@ -85,7 +85,7 @@ cgImports, cgPredefined, cgStart :: Doc
 cgImports = vsep $ map ("import" <+>)
     [ "_SystemArray"
     , "_SystemEnum"
-    , "StdPrim"
+    , "SystemPrim"
     , "StdPointer"
     ]
 cgPredefined = vsep
@@ -144,12 +144,11 @@ cgConstructors tyinfo decls =
     ":: Value" <+> align (vsep $ map (cgCon tyinfo . snd) decls)
 
 cgCon :: TyInfo -> LDecl -> Doc
-cgCon tyinfo (LConstructor name tag arity)
-    | Just basictys <- Map.lookup name tyinfo =
-        "///" <+> string (show name) <+> parens (int arity) <$>
-        "|" <+> cgConName name <+> hsep (map (cgStrict . cgParam) basictys)
-    | otherwise =
-        "/// Lookup error:" <+> string (show name)
+cgCon tyinfo (LConstructor name tag arity) =
+    "///" <+> string (show name) <+> parens (int arity) <$>
+    "|" <+> cgConName name <+> (case Map.lookup name tyinfo of
+        Just basictys -> hsep (map (cgStrict . cgParam) basictys)
+        Nothing -> hsep (replicate arity "!Value"))
 
 cgParam :: BasicTy -> Doc
 cgParam = pretty . cgBTy
@@ -162,14 +161,14 @@ cgFun tyinfo (LFun _opt name args def) =
     blank <$>
     "///" <+> (string . show) name <+> parens (int $ length args)<$>
     "///" <+> (string . deline . show) def <$>
-    (case Map.lookup name tyinfo of
-        Just basictys ->
-            let (argtys, retty) = (init basictys, last basictys) in
-            cgFunName name <+> "::" <+> (if not (null argtys)
-                then hsep (map (cgStrict . cgParam) argtys) <+> "->"
-                else empty) <+> cgParam retty
-        Nothing ->
-            "/// Couldn't lookup basic type") <$>
+    -- (case Map.lookup name tyinfo of
+    --     Just basictys ->
+    --         let (argtys, retty) = (init basictys, last basictys) in
+    --         cgFunName name <+> "::" <+> (if not (null argtys)
+    --             then hsep (map (cgStrict . cgParam) argtys) <+> "->"
+    --             else empty) <+> cgParam retty
+    --     Nothing ->
+    --         "/// Couldn't lookup basic type") <$>
     cgFunName name <+> hsep (map cgVarName args) <$>
     "=" <+> align (cgExp def)
 
@@ -187,7 +186,7 @@ cgExp (LLet name def rest) =
 cgExp (LForce (LLazyApp n args)) =
     cgExp $ LApp False (LV (Glob n)) args
 cgExp (LForce exp) =
-    cgFn "clean_Misc_force" [exp]
+    cgFn "clean_Unsafe_force" [exp]
 cgExp (LProj def idx) =
     cgUnsupported "PROJECT" (def, idx)
 -- Constructors: False, True
@@ -416,7 +415,7 @@ cgBTy (BTArith at) = cgATy at
 -- Names & Applications --------------------------------------------------------
 
 cgCoerce :: Doc -> Doc
-cgCoerce exp = appPrefix "clean_Misc_coerce" [exp]
+cgCoerce exp = appPrefix "clean_Unsafe_coerce" [exp]
 
 cgFn :: Doc -> [LExp] -> Doc
 cgFn fun args = appPrefix fun (map (cgCoerce . cgExp) args)

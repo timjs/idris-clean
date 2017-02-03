@@ -10,7 +10,8 @@ import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-import Debug.Trace
+-- import Debug.Trace
+trace = flip const
 
 -- Basic type information propagated through IR's for optimised code generation
 data BasicTy = BTFun BasicTy BasicTy
